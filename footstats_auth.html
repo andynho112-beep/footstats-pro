@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>FootStats Pro — Acesso</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --g1:#0a0e1a;--g2:#0f1526;--g3:#151d35;--g4:#1a2540;
+  --accent:#00e5a0;--accent2:#ff6b35;--accent3:#4fc3f7;
+  --gold:#ffd700;--red:#ff4444;--text:#e8eaf6;--muted:#7986cb;
+  --card:rgba(255,255,255,0.04);--border:rgba(255,255,255,0.08);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--g1);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:24px 16px 40px;}
+
+/* ── LOGO ── */
+.logo-wrap{text-align:center;margin-bottom:28px;margin-top:16px;}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:38px;color:var(--accent);letter-spacing:3px;}
+.logo span{color:var(--accent2);}
+.logo-sub{font-size:12px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
+
+/* ── CARD ── */
+.card{background:var(--g3);border:1px solid var(--border);border-radius:20px;padding:24px;width:100%;max-width:400px;}
+.card-title{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--accent);letter-spacing:1px;margin-bottom:4px;}
+.card-sub{font-size:13px;color:var(--muted);margin-bottom:20px;}
+
+/* ── TABS ── */
+.tabs{display:flex;background:rgba(255,255,255,.04);border-radius:10px;padding:3px;margin-bottom:20px;}
+.tab{flex:1;padding:8px;font-size:13px;font-weight:600;background:none;border:none;color:var(--muted);border-radius:8px;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;}
+.tab.active{background:var(--g4);color:var(--text);}
+
+/* ── FORM ── */
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:500;}
+.field input{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent);}
+.field input::placeholder{color:var(--muted);}
+
+/* ── BUTTONS ── */
+.btn-primary{width:100%;background:var(--accent);color:var(--g1);border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:opacity .2s;margin-top:4px;}
+.btn-primary:hover{opacity:.9;}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+.btn-outline{width:100%;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:10px;transition:all .2s;}
+.btn-outline:hover{border-color:var(--muted);color:var(--text);}
+
+/* ── PLANOS ── */
+.plans{display:flex;flex-direction:column;gap:12px;margin-bottom:20px;}
+.plan{border:2px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;transition:all .2s;position:relative;}
+.plan.selected{border-color:var(--accent);background:rgba(0,229,160,.06);}
+.plan-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.plan-name{font-size:15px;font-weight:700;}
+.plan-price{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;}
+.plan-price.mensal{color:var(--accent3);}
+.plan-price.vitalicio{color:var(--gold);}
+.plan-desc{font-size:12px;color:var(--muted);line-height:1.6;}
+.plan-badge{position:absolute;top:-10px;right:12px;background:var(--gold);color:var(--g1);font-size:10px;font-weight:700;padding:2px 10px;border-radius:20px;}
+.plan-radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.plan.selected .plan-radio{border-color:var(--accent);background:var(--accent);}
+.plan-radio-dot{width:8px;height:8px;border-radius:50%;background:#fff;display:none;}
+.plan.selected .plan-radio-dot{display:block;}
+
+/* ── STATUS ── */
+.msg{padding:12px 14px;border-radius:10px;font-size:13px;margin-bottom:14px;display:none;}
+.msg.error{background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.3);color:#ff8080;display:block;}
+.msg.success{background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3);color:var(--accent);display:block;}
+.msg.info{background:rgba(79,195,247,.08);border:1px solid rgba(79,195,247,.3);color:var(--accent3);display:block;}
+
+/* ── PERFIL ── */
+.profile-card{background:linear-gradient(135deg,rgba(0,229,160,.1),rgba(79,195,247,.06));border:1px solid rgba(0,229,160,.3);border-radius:16px;padding:18px;margin-bottom:16px;}
+.profile-name{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;margin-bottom:4px;}
+.profile-email{font-size:12px;color:var(--muted);margin-bottom:12px;}
+.profile-plan{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;}
+.profile-plan.mensal{background:rgba(79,195,247,.15);color:var(--accent3);border:1px solid rgba(79,195,247,.3);}
+.profile-plan.vitalicio{background:rgba(255,215,0,.15);color:var(--gold);border:1px solid rgba(255,215,0,.3);}
+.profile-plan.expirado{background:rgba(255,68,68,.12);color:var(--red);border:1px solid rgba(255,68,68,.3);}
+.expiry{font-size:11px;color:var(--muted);margin-top:8px;}
+
+/* ── DIVIDER ── */
+.divider{display:flex;align-items:center;gap:10px;margin:16px 0;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border);}
+.divider span{font-size:11px;color:var(--muted);}
+
+/* ── PIX ── */
+.pix-box{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;}
+.pix-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+.pix-steps{display:flex;flex-direction:column;gap:8px;}
+.pix-step{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--muted);}
+.pix-num{width:20px;height:20px;border-radius:50%;background:rgba(0,229,160,.15);border:1px solid rgba(0,229,160,.3);color:var(--accent);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+
+.spinner-sm{width:16px;height:16px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.link{color:var(--accent3);cursor:pointer;text-decoration:underline;font-size:12px;}
+.back-link{display:flex;align-items:center;gap:5px;color:var(--muted);cursor:pointer;font-size:13px;margin-bottom:16px;}
+.back-link:hover{color:var(--text);}
+
+/* ── PAGAMENTO STATUS ── */
+.payment-waiting{text-align:center;padding:20px 0;}
+.payment-icon{font-size:48px;margin-bottom:12px;}
+.payment-title{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--gold);letter-spacing:1px;margin-bottom:6px;}
+.payment-desc{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:16px;}
+</style>
+</head>
+<body>
+
+<div class="logo-wrap">
+  <div class="logo">FOOT<span>STATS</span> PRO</div>
+  <div class="logo-sub">Análises & Palpites com IA</div>
+</div>
+
+<div class="card" id="mainCard">
+  <!-- Conteúdo injetado por JS -->
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+// ⚙️  CONFIGURAÇÕES — preencha após criar as contas
+// ════════════════════════════════════════════════════════
+var CONFIG = {
+  // SUPABASE — configurado ✅
+  SUPABASE_URL: 'https://hbgjtznxkkwaznonayzu.supabase.co',
+  SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiZ2p0em54a2t3YXpub25heXp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNzUzMTAsImV4cCI6MjA5NzY1MTMxMH0.G38tp_p5dtVM9bEfBmPjnDruIZrZLSQzXt0L221-fSs',
+
+  // MERCADO PAGO — configurado ✅
+  MP_PUBLIC_KEY: 'COLE_SUA_MP_PUBLIC_KEY_AQUI',
+  LINK_MENSAL:   'https://mpago.li/2xukV2D',    // R$ 35,00 ✅
+  LINK_VITALICIO:'https://mpago.la/2Ws2PNM',    // R$ 350,00 ✅
+
+  // PLANOS
+  PRECO_MENSAL:    35,
+  PRECO_VITALICIO: 350,
+
+  // EMAIL DO ADMIN
+  ADMIN_EMAIL: 'andynho112@hotmail.com',
+};
+// ════════════════════════════════════════════════════════
+
+// ── ESTADO ──────────────────────────────────────────────
+var APP = {
+  screen: 'login',      // login | cadastro | planos | pagamento | perfil | app
+  user: null,
+  planoSelecionado: 'mensal',
+  loading: false,
+};
+
+// ── SUPABASE HELPER ─────────────────────────────────────
+async function sbFetch(path, method, body) {
+  try {
+    var headers = {
+      'Content-Type': 'application/json',
+      'apikey': CONFIG.SUPABASE_KEY,
+      'Authorization': 'Bearer ' + CONFIG.SUPABASE_KEY,
+    };
+    if (method === 'POST') headers['Prefer'] = 'return=representation';
+    if (method === 'PATCH') headers['Prefer'] = 'return=representation';
+    var r = await fetch(CONFIG.SUPABASE_URL + path, {
+      method: method || 'GET',
+      headers: headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    var txt = await r.text();
+    var d = txt ? JSON.parse(txt) : null;
+    return { ok: r.ok, data: d, status: r.status };
+  } catch(e) {
+    return { ok: false, data: null, error: e.message };
+  }
+}
+
+// ── AUTH SUPABASE (REST direto) ─────────────────────────
+async function sbSignUp(email, password, nome) {
+  var emailClean = email.toLowerCase().trim();
+  var check = await sbFetch('/rest/v1/usuarios?email=eq.' + encodeURIComponent(emailClean), 'GET');
+  if (check.ok && check.data && check.data.length > 0) {
+    return { ok: false, error: 'E-mail já cadastrado.' };
+  }
+  var hash = btoa(unescape(encodeURIComponent(password + '_fsp_salt')));
+  var r = await sbFetch('/rest/v1/usuarios', 'POST', {
+    email: emailClean,
+    senha_hash: hash,
+    nome: nome,
+    plano: null,
+    expira_em: null,
+    criado_em: new Date().toISOString(),
+    ativo: false,
+  });
+  return r;
+}
+
+async function sbSignIn(email, password) {
+  var emailClean = email.toLowerCase().trim();
+
+  // ADMIN — acesso direto
+  if (emailClean === CONFIG.ADMIN_EMAIL.toLowerCase()) {
+    var r = await sbFetch('/rest/v1/usuarios?email=eq.' + encodeURIComponent(emailClean) + '&select=*', 'GET');
+
+    // Primeira vez — cria conta admin automaticamente com a senha digitada
+    if (!r.ok || !r.data || !r.data.length) {
+      var cr = await sbFetch('/rest/v1/usuarios', 'POST', {
+        email: emailClean,
+        senha_hash: btoa(unescape(encodeURIComponent(password + '_fsp_salt'))),
+        nome: 'Admin',
+        plano: 'vitalicio',
+        expira_em: null,
+        criado_em: new Date().toISOString(),
+        ativo: true,
+      });
+      if (!cr.ok) return { ok: false, error: 'Erro ao criar conta admin: ' + JSON.stringify(cr.data) };
+      return { ok: true, user: { email: emailClean, nome: 'Admin', plano: 'vitalicio', ativo: true, expira_em: null } };
+    }
+
+    var u = r.data[0];
+    // Verifica senha
+    var hash = btoa(unescape(encodeURIComponent(password + '_fsp_salt')));
+    if (u.senha_hash !== hash) return { ok: false, error: 'Senha incorreta.' };
+    // Garante acesso vitalício sempre
+    if (!u.ativo || u.plano !== 'vitalicio') {
+      await sbFetch('/rest/v1/usuarios?email=eq.' + encodeURIComponent(emailClean), 'PATCH', {
+        plano: 'vitalicio', ativo: true, expira_em: null
+      });
+      u.plano = 'vitalicio'; u.ativo = true;
+    }
+    return { ok: true, user: u };
+  }
+
+  // Usuário normal
+  var r = await sbFetch('/rest/v1/usuarios?email=eq.' + encodeURIComponent(emailClean) + '&select=*', 'GET');
+  if (!r.ok || !r.data || !r.data.length) return { ok: false, error: 'E-mail não encontrado.' };
+  var u = r.data[0];
+  var hash = btoa(unescape(encodeURIComponent(password + '_fsp_salt')));
+  if (u.senha_hash !== hash) return { ok: false, error: 'Senha incorreta.' };
+  return { ok: true, user: u };
+}
+
+async function sbGetUser(email) {
+  var r = await sbFetch('/rest/v1/usuarios?email=eq.' + encodeURIComponent(email) + '&select=*', 'GET');
+  if (!r.ok || !r.data || !r.data.length) return null;
+  return r.data[0];
+}
+
+// ── VERIFICAR ACESSO ─────────────────────────────────────
+function temAcesso(user) {
+  if (!user || !user.ativo) return false;
+  if (user.plano === 'vitalicio') return true;
+  if (user.plano === 'mensal' && user.expira_em) {
+    return new Date(user.expira_em) > new Date();
+  }
+  return false;
+}
+
+function diasRestantes(user) {
+  if (!user || !user.expira_em) return 0;
+  var diff = new Date(user.expira_em) - new Date();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
+// ── LOCAL STORAGE SESSION ────────────────────────────────
+function saveSession(user) {
+  try { localStorage.setItem('fsp_session', JSON.stringify({ email: user.email, ts: Date.now() })); } catch(e) {}
+}
+function getSession() {
+  try {
+    var s = JSON.parse(localStorage.getItem('fsp_session') || 'null');
+    if (!s) return null;
+    // Sessão expira em 30 dias
+    if (Date.now() - s.ts > 30 * 24 * 3600 * 1000) { localStorage.removeItem('fsp_session'); return null; }
+    return s;
+  } catch(e) { return null; }
+}
+function clearSession() {
+  try { localStorage.removeItem('fsp_session'); } catch(e) {}
+}
+
+// ── RENDER ───────────────────────────────────────────────
+function render() {
+  var c = document.getElementById('mainCard');
+  switch(APP.screen) {
+    case 'login':     c.innerHTML = renderLogin(); break;
+    case 'cadastro':  c.innerHTML = renderCadastro(); break;
+    case 'planos':    c.innerHTML = renderPlanos(); break;
+    case 'pagamento': c.innerHTML = renderPagamento(); break;
+    case 'perfil':    c.innerHTML = renderPerfil(); break;
+    case 'aguardando':c.innerHTML = renderAguardando(); break;
+  }
+}
+
+// ── TELA LOGIN ───────────────────────────────────────────
+function renderLogin() {
+  return '<div class="card-title">Entrar</div>' +
+    '<div class="card-sub">Acesse sua conta FootStats Pro</div>' +
+    '<div class="msg" id="msgLogin"></div>' +
+    '<div class="field"><label>E-mail</label><input id="loginEmail" type="email" placeholder="seu@email.com" autocomplete="email"></div>' +
+    '<div class="field"><label>Senha</label><input id="loginSenha" type="password" placeholder="••••••••" autocomplete="current-password"></div>' +
+    '<button class="btn-primary" onclick="doLogin()" id="btnLogin">Entrar</button>' +
+    '<div class="divider"><span>ou</span></div>' +
+    '<button class="btn-outline" onclick="APP.screen=\'cadastro\';render()">Criar conta gratuita</button>' +
+    '<div style="text-align:center;margin-top:14px"><span class="link" onclick="APP.screen=\'planos\';render()">Ver planos e preços</span></div>';
+}
+
+async function doLogin() {
+  var email = (document.getElementById('loginEmail').value||'').trim();
+  var senha = (document.getElementById('loginSenha').value||'').trim();
+  var msg = document.getElementById('msgLogin');
+  var btn = document.getElementById('btnLogin');
+
+  if (!email || !senha) { showMsg(msg, 'error', 'Preencha todos os campos.'); return; }
+  if (APP.loading) return;
+
+  // Modo demo — sem Supabase configurado
+  if (false) {
+    showMsg(msg, 'info', '⚙️ Supabase não configurado — entrando em modo demo.');
+    setTimeout(function(){
+      APP.user = { nome: 'Usuário Demo', email: email, plano: 'mensal', ativo: true, expira_em: new Date(Date.now() + 30*864e5).toISOString() };
+      APP.screen = 'perfil'; render();
+    }, 1200);
+    return;
+  }
+
+  APP.loading = true;
+  btn.innerHTML = '<span class="spinner-sm"></span>Entrando...';
+  btn.disabled = true;
+
+  var r = await sbSignIn(email, senha);
+  APP.loading = false;
+  btn.innerHTML = 'Entrar';
+  btn.disabled = false;
+
+  if (!r.ok) {
+    showMsg(msg, 'error', r.error || 'Erro ao entrar. Verifique seus dados.');
+    return;
+  }
+
+  APP.user = r.user;
+  saveSession(r.user);
+
+  if (!temAcesso(r.user)) {
+    APP.screen = 'planos'; render();
+  } else {
+    APP.screen = 'perfil'; render();
+  }
+}
+
+// ── TELA CADASTRO ────────────────────────────────────────
+function renderCadastro() {
+  return '<span class="back-link" onclick="APP.screen=\'login\';render()">← Voltar</span>' +
+    '<div class="card-title">Criar Conta</div>' +
+    '<div class="card-sub">Cadastre-se e escolha seu plano</div>' +
+    '<div class="msg" id="msgCad"></div>' +
+    '<div class="field"><label>Nome</label><input id="cadNome" type="text" placeholder="Seu nome" autocomplete="name"></div>' +
+    '<div class="field"><label>E-mail</label><input id="cadEmail" type="email" placeholder="seu@email.com" autocomplete="email"></div>' +
+    '<div class="field"><label>Senha</label><input id="cadSenha" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password"></div>' +
+    '<div class="field"><label>Confirmar senha</label><input id="cadSenha2" type="password" placeholder="Repita a senha" autocomplete="new-password"></div>' +
+    '<button class="btn-primary" onclick="doCadastro()" id="btnCad">Criar conta e ver planos</button>';
+}
+
+async function doCadastro() {
+  var nome   = (document.getElementById('cadNome').value||'').trim();
+  var email  = (document.getElementById('cadEmail').value||'').trim();
+  var senha  = (document.getElementById('cadSenha').value||'').trim();
+  var senha2 = (document.getElementById('cadSenha2').value||'').trim();
+  var msg    = document.getElementById('msgCad');
+  var btn    = document.getElementById('btnCad');
+
+  if (!nome || !email || !senha) { showMsg(msg, 'error', 'Preencha todos os campos.'); return; }
+  if (senha.length < 6) { showMsg(msg, 'error', 'Senha deve ter pelo menos 6 caracteres.'); return; }
+  if (senha !== senha2) { showMsg(msg, 'error', 'As senhas não coincidem.'); return; }
+  if (APP.loading) return;
+
+  // Modo demo desativado (Supabase configurado)
+  if (false) { APP.user = { nome: nome, email: email, plano: null, ativo: false }; APP.screen = 'planos'; render(); return; }
+
+  APP.loading = true;
+  btn.innerHTML = '<span class="spinner-sm"></span>Criando conta...';
+  btn.disabled = true;
+
+  var r = await sbSignUp(email, senha, nome);
+  APP.loading = false;
+  btn.innerHTML = 'Criar conta e ver planos';
+  btn.disabled = false;
+
+  if (!r.ok) { showMsg(msg, 'error', r.error || 'Erro ao criar conta.'); return; }
+
+  APP.user = r.data && r.data[0] ? r.data[0] : { nome: nome, email: email, plano: null, ativo: false };
+  APP.screen = 'planos'; render();
+}
+
+// ── TELA PLANOS ──────────────────────────────────────────
+function renderPlanos() {
+  var logado = APP.user ? true : false;
+  return (logado ? '<span class="back-link" onclick="APP.screen=\'perfil\';render()">← Voltar</span>' : '<span class="back-link" onclick="APP.screen=\'login\';render()">← Voltar</span>') +
+    '<div class="card-title">Escolha seu Plano</div>' +
+    '<div class="card-sub">Acesso completo a análises IA, palpites e estatísticas</div>' +
+    '<div class="msg" id="msgPlanos"></div>' +
+    '<div class="plans">' +
+
+      // Mensal
+      '<div class="plan' + (APP.planoSelecionado === 'mensal' ? ' selected' : '') + '" onclick="selecionarPlano(\'mensal\')" id="planMensal">' +
+        '<div class="plan-header">' +
+          '<div>' +
+            '<div class="plan-name">Plano Mensal</div>' +
+            '<div class="plan-price mensal">R$ ' + CONFIG.PRECO_MENSAL + '<span style="font-size:14px;color:var(--muted)">/mês</span></div>' +
+          '</div>' +
+          '<div class="plan-radio"><div class="plan-radio-dot"></div></div>' +
+        '</div>' +
+        '<div class="plan-desc">✓ Análises IA completas com jogadores<br>✓ Palpites prontos diários<br>✓ Estatísticas detalhadas<br>✓ Relatório de acertos por mercado<br>✓ Cancele quando quiser</div>' +
+      '</div>' +
+
+      // Vitalício
+      '<div class="plan' + (APP.planoSelecionado === 'vitalicio' ? ' selected' : '') + '" onclick="selecionarPlano(\'vitalicio\')" id="planVitalicio">' +
+        '<div class="plan-badge">MELHOR VALOR</div>' +
+        '<div class="plan-header">' +
+          '<div>' +
+            '<div class="plan-name">Plano Vitalício</div>' +
+            '<div class="plan-price vitalicio">R$ ' + CONFIG.PRECO_VITALICIO + '<span style="font-size:14px;color:var(--muted)"> único</span></div>' +
+          '</div>' +
+          '<div class="plan-radio"><div class="plan-radio-dot"></div></div>' +
+        '</div>' +
+        '<div class="plan-desc">✓ Tudo do plano mensal<br>✓ Acesso vitalício sem renovação<br>✓ Atualizações futuras inclusas<br>✓ Equivale a <strong style="color:var(--gold)">10 meses</strong> pelo preço de 8</div>' +
+      '</div>' +
+
+    '</div>' +
+    '<button class="btn-primary" onclick="irParaPagamento()">Assinar — R$ ' + (APP.planoSelecionado === 'mensal' ? CONFIG.PRECO_MENSAL + '/mês' : CONFIG.PRECO_VITALICIO + ' vitalício') + '</button>' +
+    '<div style="text-align:center;margin-top:10px;font-size:11px;color:var(--muted)">Pagamento via Pix pelo Mercado Pago · Seguro e instantâneo</div>';
+}
+
+function selecionarPlano(plano) {
+  APP.planoSelecionado = plano;
+  render();
+}
+
+function irParaPagamento() {
+  APP.screen = 'pagamento'; render();
+}
+
+// ── TELA PAGAMENTO ───────────────────────────────────────
+function renderPagamento() {
+  var link = APP.planoSelecionado === 'mensal' ? CONFIG.LINK_MENSAL : CONFIG.LINK_VITALICIO;
+  var preco = APP.planoSelecionado === 'mensal' ? 'R$ ' + CONFIG.PRECO_MENSAL + '/mês' : 'R$ ' + CONFIG.PRECO_VITALICIO + ' vitalício';
+  var nomeP = APP.planoSelecionado === 'mensal' ? 'Mensal' : 'Vitalício';
+  var linkOk = link && link.indexOf('COLE') < 0 && link.indexOf('http') >= 0;
+
+  return '<span class="back-link" onclick="APP.screen=\'planos\';render()">← Voltar aos planos</span>' +
+    '<div class="card-title">Pagamento</div>' +
+    '<div class="card-sub">Plano ' + nomeP + ' · ' + preco + '</div>' +
+
+    '<div class="pix-box">' +
+      '<div class="pix-title">📋 Como funciona</div>' +
+      '<div class="pix-steps">' +
+        '<div class="pix-step"><div class="pix-num">1</div><span>Clique em "Pagar agora" — você será redirecionado ao Mercado Pago</span></div>' +
+        '<div class="pix-step"><div class="pix-num">2</div><span>Pague via Pix, cartão ou boleto</span></div>' +
+        '<div class="pix-step"><div class="pix-num">3</div><span>Volte aqui e clique em "Já paguei — verificar acesso"</span></div>' +
+        '<div class="pix-step"><div class="pix-num">4</div><span>Seu acesso será liberado automaticamente</span></div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="msg" id="msgPag"></div>' +
+
+    (linkOk ?
+      '<a href="' + link + '" target="_blank" style="text-decoration:none"><button class="btn-primary" style="background:linear-gradient(135deg,#009ee3,#00b4d8)">💳 Pagar agora — ' + preco + '</button></a>' :
+      '<div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px;font-size:12px;color:var(--gold);margin-bottom:12px">⚙️ Configure o link de pagamento no CONFIG para ativar. <br><br>Por enquanto, entre em contato com o admin para liberar manualmente.</div>') +
+
+    '<button class="btn-outline" style="margin-top:12px" onclick="verificarPagamento()">✅ Já paguei — verificar acesso</button>' +
+    '<div style="text-align:center;margin-top:8px"><span class="link" onclick="contatoAdmin()">Problemas? Fale com o suporte</span></div>';
+}
+
+async function verificarPagamento() {
+  var msg = document.getElementById('msgPag');
+  if (!APP.user) { showMsg(msg, 'error', 'Faça login primeiro.'); return; }
+
+  showMsg(msg, 'info', '<span class="spinner-sm"></span>Verificando pagamento...');
+
+  // Supabase configurado — verificação real
+  if (false) {
+    await sleep(1500);
+    APP.user.plano = APP.planoSelecionado;
+    APP.user.ativo = true;
+    if (APP.planoSelecionado === 'mensal') {
+      APP.user.expira_em = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+    }
+    showMsg(msg, 'success', '✅ Acesso liberado! Redirecionando...');
+    setTimeout(function(){ APP.screen = 'perfil'; render(); }, 1500);
+    return;
+  }
+
+  // Busca usuário atualizado no banco
+  var u = await sbGetUser(APP.user.email);
+  if (!u) { showMsg(msg, 'error', 'Usuário não encontrado.'); return; }
+
+  if (temAcesso(u)) {
+    APP.user = u;
+    saveSession(u);
+    showMsg(msg, 'success', '✅ Pagamento confirmado! Bem-vindo ao FootStats Pro!');
+    setTimeout(function(){ APP.screen = 'perfil'; render(); }, 1500);
+  } else {
+    showMsg(msg, 'error', '⏳ Pagamento ainda não confirmado. Aguarde alguns minutos e tente novamente. Se já pagou, entre em contato com o suporte.');
+  }
+}
+
+function contatoAdmin() {
+  var msg = document.getElementById('msgPag');
+  showMsg(msg, 'info', '📱 Entre em contato: andynho112@hotmail.com — informe seu e-mail cadastrado e o comprovante de pagamento.');
+}
+
+// ── TELA AGUARDANDO ──────────────────────────────────────
+function renderAguardando() {
+  return '<div class="payment-waiting">' +
+    '<div class="payment-icon">⏳</div>' +
+    '<div class="payment-title">Aguardando Pagamento</div>' +
+    '<div class="payment-desc">Seu pagamento está sendo processado.<br>Assim que confirmado, seu acesso será liberado automaticamente.<br><br>Isso pode levar até <strong style="color:#fff">5 minutos</strong> após o pagamento.</div>' +
+    '<button class="btn-primary" onclick="verificarStatusManual()">🔄 Verificar agora</button>' +
+    '<button class="btn-outline" onclick="APP.screen=\'login\';render()">Voltar ao login</button>' +
+  '</div>';
+}
+
+async function verificarStatusManual() {
+  if (!APP.user) { APP.screen = 'login'; render(); return; }
+  var u = await sbGetUser(APP.user.email);
+  if (u && temAcesso(u)) {
+    APP.user = u; saveSession(u);
+    APP.screen = 'perfil'; render();
+  } else {
+    showToastGlobal('Pagamento ainda não confirmado. Tente em alguns minutos.');
+  }
+}
+
+// ── TELA PERFIL / PAINEL ─────────────────────────────────
+function renderPerfil() {
+  if (!APP.user) { APP.screen = 'login'; render(); return ''; }
+  var u = APP.user;
+  var isAdmin = u.email.toLowerCase() === CONFIG.ADMIN_EMAIL.toLowerCase();
+  var acesso = temAcesso(u) || isAdmin;
+  var planoCls = u.plano === 'vitalicio' ? 'vitalicio' : (acesso ? 'mensal' : 'expirado');
+  var planoLabel = isAdmin ? '👑 Admin — Acesso Total' : (u.plano === 'vitalicio' ? '🏆 Vitalício' : (acesso ? '📅 Mensal' : '❌ Expirado'));
+  var dias = u.plano === 'mensal' && acesso ? diasRestantes(u) : null;
+
+  return '<div class="profile-card">' +
+    '<div class="profile-name">Olá, ' + (u.nome||'Usuário') + '! ' + (isAdmin ? '👑' : '👋') + '</div>' +
+    '<div class="profile-email">' + u.email + '</div>' +
+    '<span class="profile-plan ' + planoCls + '">' + planoLabel + '</span>' +
+    (dias !== null ? '<div class="expiry">⏱ ' + dias + ' dias restantes</div>' : '') +
+    (u.plano === 'vitalicio' ? '<div class="expiry">' + (isAdmin ? '🔓 Acesso de criador — sem restrições' : '✅ Acesso vitalício — nunca expira') + '</div>' : '') +
+  '</div>' +
+
+  (acesso ?
+    '<button class="btn-primary" onclick="abrirApp()" style="font-size:16px;padding:16px">🚀 Abrir FootStats Pro</button>' +
+    '<div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px">Análises IA · Palpites · Estatísticas</div>' :
+    '<div style="background:rgba(255,68,68,.08);border:1px solid rgba(255,68,68,.2);border-radius:10px;padding:12px;font-size:13px;color:var(--red);margin-bottom:14px">Seu acesso expirou ou ainda não foi ativado.</div>' +
+    '<button class="btn-primary" onclick="APP.screen=\'planos\';render()">Renovar acesso</button>'
+  ) +
+
+  (isAdmin ?
+    '<div style="margin-top:12px;background:rgba(255,215,0,.06);border:1px solid rgba(255,215,0,.2);border-radius:12px;padding:12px">' +
+      '<div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">👑 Painel Admin</div>' +
+      '<a href="https://supabase.com/dashboard/project/hbgjtznxkkwaznonayzu/editor" target="_blank" style="text-decoration:none">' +
+        '<button class="btn-outline" style="border-color:rgba(255,215,0,.3);color:var(--gold);margin-bottom:6px">📋 Gerenciar usuários (Supabase)</button>' +
+      '</a>' +
+      '<div style="font-size:11px;color:var(--muted);line-height:1.6">Para liberar acesso após pagamento:<br>1. Abra a tabela <strong style="color:#fff">usuarios</strong><br>2. Edite: <strong style="color:#fff">ativo = true</strong>, plano = mensal/vitalicio<br>3. Para mensal: expira_em = data + 30 dias</div>' +
+    '</div>' : '') +
+
+  '<div style="margin-top:12px;display:flex;gap:10px">' +
+    (!isAdmin && u.plano !== 'vitalicio' && acesso ? '<button class="btn-outline" style="flex:1" onclick="APP.screen=\'planos\';render()">Upgrade Vitalício</button>' : '') +
+    '<button class="btn-outline" style="flex:1;color:var(--red);border-color:rgba(255,68,68,.3)" onclick="sair()">Sair</button>' +
+  '</div>';
+}
+
+function abrirApp() {
+  try {
+    localStorage.setItem('fsp_access', JSON.stringify({
+      email: APP.user.email,
+      nome: APP.user.nome,
+      plano: APP.user.plano,
+      expira_em: APP.user.expira_em,
+      ts: Date.now()
+    }));
+  } catch(e) {}
+  // Redireciona para o app — tenta mesma pasta, senão raiz
+  var base = window.location.href.replace(/\/[^\/]*$/, '/');
+  window.location.href = base + 'futebol_stats_pro_v26.html';
+}
+
+function sair() {
+  clearSession();
+  try { localStorage.removeItem('fsp_access'); } catch(e) {}
+  APP.user = null;
+  APP.screen = 'login';
+  render();
+}
+
+// ── HELPERS ──────────────────────────────────────────────
+function showMsg(el, type, text) {
+  if (!el) return;
+  el.className = 'msg ' + type;
+  el.innerHTML = text;
+  el.style.display = 'block';
+}
+
+function sleep(ms) { return new Promise(function(r){ setTimeout(r, ms); }); }
+
+function showToastGlobal(msg) {
+  var t = document.getElementById('toastG');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toastG';
+    t.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--g3);border:1px solid var(--border);color:var(--text);font-size:13px;padding:10px 20px;border-radius:24px;z-index:999;max-width:90vw;text-align:center;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  setTimeout(function(){ t.style.opacity = '0'; }, 3000);
+}
+
+// ── INIT ─────────────────────────────────────────────────
+async function init() {
+  // Verifica se veio de callback de pagamento
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('payment_status') === 'approved') {
+    APP.screen = 'aguardando';
+    render();
+    return;
+  }
+
+  // Tenta restaurar sessão
+  var session = getSession();
+  if (session) {
+    var u = await sbGetUser(session.email);
+    if (u) {
+      APP.user = u;
+      APP.screen = temAcesso(u) ? 'perfil' : 'planos';
+    }
+  }
+
+  render();
+}
+
+init();
+</script>
+
+<!--
+═══════════════════════════════════════════════════════════
+  📋 INSTRUÇÕES DE CONFIGURAÇÃO
+═══════════════════════════════════════════════════════════
+
+  PASSO 1 — SUPABASE (banco de dados grátis)
+  ──────────────────────────────────────────
+  1. Acesse: https://supabase.com e crie conta
+  2. Clique em "New Project" → dê um nome (ex: footstats)
+  3. Vá em Settings > API → copie:
+     - Project URL → cole em CONFIG.SUPABASE_URL
+     - anon/public key → cole em CONFIG.SUPABASE_KEY
+  4. Vá em Table Editor → New Table:
+     Nome: usuarios
+     Colunas:
+       id          bigint (primary key, auto)
+       email       text (unique, not null)
+       senha_hash  text
+       nome        text
+       plano       text (null = sem plano)
+       expira_em   timestamptz (nullable)
+       criado_em   timestamptz
+       ativo       boolean default false
+  5. Em Authentication > Policies → desative RLS para a tabela
+     (ou crie policies para anon pode SELECT/INSERT/UPDATE)
+
+  PASSO 2 — MERCADO PAGO (pagamento)
+  ────────────────────────────────────
+  1. Acesse: https://mercadopago.com.br → crie conta
+  2. Vá em Seu negócio > Ferramentas > Credenciais
+  3. Copie Public Key → cole em CONFIG.MP_PUBLIC_KEY
+  4. Vá em Cobranças > Link de pagamento → crie 2 links:
+     - "FootStats Pro — Mensal" R$ 35,00
+       URL de retorno: URL_DO_SEU_APP/?payment_status=approved
+       Cole o link em CONFIG.LINK_MENSAL
+     - "FootStats Pro — Vitalício" R$ 350,00
+       Cole o link em CONFIG.LINK_VITALICIO
+  5. Para liberar acesso automático: configure Webhook no MP
+     apontando para uma função Supabase Edge Function
+     (ou libere manualmente via Supabase Table Editor)
+
+  PASSO 3 — LIBERAR ACESSO MANUAL (mais simples)
+  ───────────────────────────────────────────────
+  Após o cliente pagar:
+  1. Abra Supabase > Table Editor > usuarios
+  2. Encontre o e-mail do cliente
+  3. Edite: ativo = true, plano = 'mensal' ou 'vitalicio'
+     expira_em = (para mensal) data daqui a 30 dias
+  
+  PASSO 4 — HOSPEDAGEM (Vercel — grátis)
+  ────────────────────────────────────────
+  1. Acesse: https://vercel.com → crie conta com GitHub
+  2. Coloque os 2 arquivos HTML em um repositório GitHub
+  3. Importe no Vercel → deploy automático
+  4. Você terá uma URL tipo: footstats.vercel.app
+
+═══════════════════════════════════════════════════════════
+-->
+
+</body>
+</html>
