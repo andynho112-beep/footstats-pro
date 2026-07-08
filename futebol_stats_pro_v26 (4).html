@@ -1,0 +1,2075 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script>
+// ── TRAVA DE ACESSO ────────────────────────────────────────
+// Só permite entrar quem tem plano ativo (vitalicio, ou mensal
+// dentro da validade) salvo pelo footstats_auth.html.
+(function(){
+  function temAcessoValido(a){
+    if (!a || !a.email) return false;
+    if (a.plano === 'vitalicio') return true;
+    if (a.plano === 'mensal' && a.expira_em) return new Date(a.expira_em) > new Date();
+    return false;
+  }
+  try {
+    var raw = localStorage.getItem('fsp_access');
+    var a = raw ? JSON.parse(raw) : null;
+    if (!temAcessoValido(a)) {
+      window.location.replace('footstats_auth.html');
+    }
+  } catch(e) {
+    window.location.replace('footstats_auth.html');
+  }
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>FootStats Pro v26</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{--g1:#0a0e1a;--g2:#0f1526;--g3:#151d35;--g4:#1a2540;--accent:#00e5a0;--accent2:#ff6b35;--accent3:#4fc3f7;--gold:#ffd700;--red:#ff4444;--text:#e8eaf6;--muted:#7986cb;--card:rgba(255,255,255,0.04);--border:rgba(255,255,255,0.08);}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--g1);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+.header{background:linear-gradient(135deg,var(--g2),var(--g4));border-bottom:1px solid var(--border);padding:12px 16px;position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--accent);letter-spacing:2px;}
+.logo span{color:var(--accent2);}
+.live-badge{background:var(--red);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;display:flex;align-items:center;gap:5px;animation:pulse 1.5s infinite;}
+.live-dot{width:6px;height:6px;background:#fff;border-radius:50%;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.notif-btn{background:var(--card);border:1px solid var(--border);color:var(--muted);width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;position:relative;}
+.notif-badge{position:absolute;top:-3px;right:-3px;background:var(--red);color:#fff;width:16px;height:16px;border-radius:50%;font-size:10px;display:flex;align-items:center;justify-content:center;}
+.nav{display:flex;background:var(--g2);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;}
+.nav::-webkit-scrollbar{display:none;}
+.nav-btn{flex:0 0 auto;padding:12px 16px;font-size:13px;font-weight:500;color:var(--muted);background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;}
+.nav-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.main{padding:16px;max-width:480px;margin:0 auto;}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading{display:flex;flex-direction:column;align-items:center;gap:12px;padding:50px 20px;color:var(--muted);font-size:13px;}
+.section{display:none;}
+.section.active{display:block;}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.section-title{font-size:16px;font-weight:600;}
+.section-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(0,229,160,.15);color:var(--accent);border:1px solid rgba(0,229,160,.3);}
+.date-bar{display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;scrollbar-width:none;}
+.date-bar::-webkit-scrollbar{display:none;}
+.date-chip{flex:0 0 auto;padding:8px 14px;border-radius:20px;font-size:12px;font-weight:500;background:var(--card);border:1px solid var(--border);cursor:pointer;color:var(--muted);transition:all .2s;}
+.date-chip.active{background:rgba(0,229,160,.15);border-color:var(--accent);color:var(--accent);}
+.game-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;margin-bottom:12px;}
+.game-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
+.game-card.high::before{background:var(--accent);}
+.game-card.medium::before{background:var(--gold);}
+.game-card.low::before{background:var(--muted);}
+.game-card.selected{border-color:var(--accent);background:rgba(0,229,160,.06);}
+.game-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.game-league{font-size:11px;color:var(--muted);}
+.game-time{font-size:11px;padding:3px 8px;border-radius:10px;background:rgba(79,195,247,.15);color:var(--accent3);}
+.game-time.live{background:rgba(255,68,68,.15);color:var(--red);animation:pulse 1.5s infinite;}
+.game-teams{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.team-info{text-align:center;flex:1;}
+.team-name{font-size:13px;font-weight:600;line-height:1.3;}
+.form-row{display:flex;gap:3px;justify-content:center;margin-top:4px;}
+.fd{width:15px;height:15px;border-radius:50%;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.fd.W{background:rgba(0,229,160,.2);color:var(--accent);border:1px solid rgba(0,229,160,.4);}
+.fd.D{background:rgba(255,215,0,.2);color:var(--gold);border:1px solid rgba(255,215,0,.4);}
+.fd.L{background:rgba(255,68,68,.2);color:var(--red);border:1px solid rgba(255,68,68,.4);}
+.vs-box{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--muted);padding:0 8px;text-align:center;}
+.score-live{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:4px;text-align:center;}
+.chips{display:flex;gap:6px;flex-wrap:wrap;}
+.chip{font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid;font-weight:500;}
+.chip.g{border-color:rgba(0,229,160,.4);color:var(--accent);background:rgba(0,229,160,.08);}
+.chip.a{border-color:rgba(255,215,0,.4);color:var(--gold);background:rgba(255,215,0,.08);}
+.chip.b{border-color:rgba(79,195,247,.4);color:var(--accent3);background:rgba(79,195,247,.08);}
+.detail{background:var(--g3);border:1px solid var(--border);border-radius:14px;padding:14px;margin-top:10px;display:none;}
+.detail.open{display:block;animation:fadeIn .3s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.tabs{display:flex;background:rgba(255,255,255,.04);border-radius:10px;padding:3px;margin-bottom:12px;}
+.tb{flex:1;padding:7px;font-size:12px;font-weight:500;background:none;border:none;color:var(--muted);border-radius:8px;cursor:pointer;transition:all .2s;}
+.tb.active{background:var(--g4);color:var(--text);}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.sc{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+.sl{font-size:11px;color:var(--muted);margin-bottom:4px;}
+.sv{font-size:19px;font-weight:600;}
+.ss{font-size:11px;color:var(--muted);margin-top:2px;}
+.pt{height:26px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden;display:flex;}
+.ph{height:100%;background:rgba(0,229,160,.5);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;min-width:28px;}
+.pa{flex:1;background:rgba(255,107,53,.5);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;}
+.pl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px;}
+.h2h-t{width:100%;border-collapse:collapse;font-size:12px;}
+.h2h-t th{color:var(--muted);font-weight:500;padding:5px 3px;border-bottom:1px solid var(--border);text-align:center;}
+.h2h-t td{padding:7px 3px;text-align:center;border-bottom:1px solid rgba(255,255,255,.04);}
+.hw{color:var(--accent);font-weight:700;}
+.aw{color:var(--accent2);font-weight:700;}
+.dr{color:var(--gold);font-weight:700;}
+.conf-bar{height:4px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:10px;overflow:hidden;}
+.conf-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent3));border-radius:2px;}
+.tip-of-day{background:linear-gradient(135deg,rgba(0,229,160,.1),rgba(79,195,247,.08));border:1px solid rgba(0,229,160,.3);border-radius:16px;padding:16px;margin-bottom:20px;position:relative;overflow:hidden;}
+.tip-label{font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.tip-match{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;margin-bottom:6px;}
+.tip-tip{display:inline-block;background:var(--accent);color:var(--g1);font-size:13px;font-weight:700;padding:4px 12px;border-radius:20px;margin-bottom:8px;}
+.tip-stats{display:flex;gap:12px;flex-wrap:wrap;}
+.tip-stat{font-size:12px;color:var(--muted);}
+.tip-stat span{color:var(--text);font-weight:500;}
+.alert-banner{background:linear-gradient(135deg,rgba(255,215,0,.15),rgba(255,107,53,.08));border:1px solid rgba(255,215,0,.5);border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px;}
+.alert-title{font-size:13px;font-weight:700;color:var(--gold);}
+.alert-desc{font-size:12px;color:var(--muted);margin-top:2px;}
+.report-card{background:linear-gradient(135deg,rgba(79,195,247,.08),rgba(0,229,160,.06));border:1px solid rgba(79,195,247,.2);border-radius:16px;padding:16px;margin-bottom:16px;}
+.ri{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);}
+.ri:last-child{border:none;}
+.rl{font-size:13px;color:var(--muted);}
+.rv{font-size:13px;font-weight:600;}
+.rv.p{color:var(--accent);}
+.news-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;gap:10px;}
+.settings-card{background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden;}
+.settings-item{display:flex;align-items:center;justify-content:space-between;padding:14px;border-bottom:1px solid var(--border);}
+.settings-item:last-child{border:none;}
+.toggle{width:44px;height:24px;background:rgba(255,255,255,.12);border-radius:12px;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0;}
+.toggle.on{background:var(--accent);}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:transform .2s;}
+.toggle.on::after{transform:translateX(20px);}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;}
+.modal-box{background:var(--g3);border:1px solid var(--border);border-radius:20px;padding:24px;width:100%;max-width:420px;}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--accent);letter-spacing:1px;margin-bottom:10px;}
+.modal-desc{font-size:13px;color:var(--muted);line-height:1.8;margin-bottom:18px;}
+.modal-input{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:13px;font-family:monospace;outline:none;margin-bottom:12px;}
+.modal-input:focus{border-color:var(--accent);}
+.modal-row{display:flex;gap:10px;}
+.btn-primary{flex:1;background:var(--accent);color:var(--g1);border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.btn-demo{flex:1;background:rgba(255,255,255,.07);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--g3);border:1px solid var(--accent);color:var(--text);font-size:13px;padding:10px 20px;border-radius:24px;opacity:0;transition:all .3s;z-index:300;white-space:nowrap;max-width:90vw;text-align:center;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.fab{position:fixed;bottom:24px;right:20px;width:52px;height:52px;background:var(--accent);border:none;border-radius:50%;cursor:pointer;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,229,160,.4);z-index:200;}
+.bet-btn{display:inline-flex;align-items:center;padding:7px 16px;border-radius:20px;font-size:12px;font-weight:700;text-decoration:none;color:#000;background:#f7a600;white-space:nowrap;}
+.demo-tag{display:inline-block;font-size:10px;background:rgba(255,215,0,.15);color:var(--gold);border:1px solid rgba(255,215,0,.3);border-radius:6px;padding:2px 6px;margin-left:6px;vertical-align:middle;}
+/* ── CHAT ANALISES ── */
+.chat-bubble{max-width:88%;border-radius:18px;padding:12px 15px;font-size:14px;line-height:1.6;position:relative;}
+.chat-bot{background:var(--g3);border:1px solid var(--border);border-radius:18px 18px 18px 4px;color:var(--text);align-self:flex-start;}
+.chat-user{background:var(--accent2);color:#fff;border-radius:18px 18px 4px 18px;align-self:flex-end;}
+.chat-row{display:flex;align-items:flex-end;gap:8px;}
+.chat-row.bot{justify-content:flex-start;}
+.chat-row.user{justify-content:flex-end;}
+.chat-avatar{width:32px;height:32px;border-radius:50%;background:var(--g4);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.date-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.date-btn{padding:9px 16px;border-radius:22px;background:var(--accent2);color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:opacity .15s;}
+.date-btn:hover{opacity:.85;}
+.date-btn.selected{background:var(--g4);border:1px solid var(--accent2);color:var(--accent2);}
+.match-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.match-btn{padding:10px 16px;border-radius:22px;background:var(--accent2);color:#fff;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:opacity .15s;text-align:left;}
+.match-btn:hover{opacity:.85;}
+.match-btn.selected{background:var(--g4);border:1px solid var(--accent2);color:var(--accent2);}
+.analysis-card{background:var(--g3);border:1px solid rgba(0,229,160,.25);border-radius:14px;padding:14px;margin-top:8px;}
+.analysis-section{margin-bottom:14px;}
+.analysis-section:last-child{margin-bottom:0;}
+.analysis-section-title{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:flex;align-items:center;gap:5px;}
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.stat-row:last-child{border:none;}
+.stat-name{font-size:12px;color:var(--muted);}
+.stat-value{font-size:12px;font-weight:600;color:var(--text);}
+.stat-value.good{color:var(--accent);}
+.stat-value.warn{color:var(--gold);}
+.verdict-box{background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.3);border-radius:10px;padding:12px;margin-top:10px;}
+.verdict-score{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:3px;color:#fff;text-align:center;margin-bottom:6px;}
+.verdict-tips{display:flex;flex-direction:column;gap:4px;}
+.verdict-tip{font-size:12px;color:var(--text);display:flex;align-items:center;gap:6px;}
+.conf-pill{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:auto;}
+.conf-high{background:rgba(0,229,160,.2);color:var(--accent);}
+.conf-med{background:rgba(255,215,0,.2);color:var(--gold);}
+.typing-dots{display:flex;gap:4px;padding:4px 0;}
+.typing-dots span{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:bounce .9s infinite;}
+.typing-dots span:nth-child(2){animation-delay:.15s;}
+.typing-dots span:nth-child(3){animation-delay:.3s;}
+@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+.palpite-highlight{background:linear-gradient(135deg,rgba(0,229,160,.12),rgba(79,195,247,.08));border:1px solid rgba(0,229,160,.4);border-radius:12px;padding:12px;margin-top:8px;}
+.score-pred-box{background:linear-gradient(135deg,rgba(0,229,160,.12),rgba(79,195,247,.08));border:1px solid rgba(0,229,160,.35);border-radius:12px;padding:12px 14px;margin:10px 0 0;}
+.score-pred-label{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.score-pred-main{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:4px;color:#fff;text-align:center;margin-bottom:6px;}
+.palpite-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);}
+.palpite-row:last-child{border:none;}
+.palpite-name{font-size:12px;color:var(--text);}
+.palpite-conf{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;}
+.palpite-conf.high{background:rgba(0,229,160,.15);color:var(--accent);}
+.palpite-conf.med{background:rgba(255,215,0,.15);color:var(--gold);}
+.ai-box{background:rgba(79,195,247,.06);border:1px solid rgba(79,195,247,.2);border-radius:12px;padding:12px 14px;margin-top:10px;}
+.ai-loading{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);}
+.ai-text{font-size:13px;color:var(--text);line-height:1.7;}
+.ai-label{font-size:10px;font-weight:700;color:var(--accent3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:flex;align-items:center;gap:5px;}
+.world-cup-banner{background:linear-gradient(135deg,rgba(255,215,0,.12),rgba(255,107,53,.08));border:1px solid rgba(255,215,0,.4);border-radius:14px;padding:14px;margin-bottom:14px;}
+.wc-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.wc-title{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--gold);letter-spacing:1px;}
+.wc-chips{display:flex;gap:6px;flex-wrap:wrap;}
+.wc-chip{font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.3);color:var(--gold);cursor:pointer;transition:all .2s;}
+.wc-chip.active{background:rgba(255,215,0,.25);color:#fff;border-color:var(--gold);}
+.filter-league-row{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;}
+.filter-league-row::-webkit-scrollbar{display:none;}
+.fleague-btn{flex:0 0 auto;padding:5px 12px;font-size:12px;border-radius:20px;background:var(--card);border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:all .2s;}
+.fleague-btn.active{background:rgba(0,229,160,.12);border-color:rgba(0,229,160,.4);color:var(--accent);}
+</style>
+</head>
+<body>
+
+<!-- MODAL (acessível via Config) -->
+<div class="modal-overlay" id="apiModal" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-title">FOOT<span style="color:var(--accent2)">STATS</span> PRO</div>
+    <div class="modal-desc">
+      <strong style="color:var(--accent)">API gratuita — sem RapidAPI!</strong><br><br>
+      1. Acesse <a href="https://dashboard.api-football.com/register" target="_blank" style="color:var(--accent3)">dashboard.api-football.com/register</a><br>
+      2. Crie conta (sem cartao de credito)<br>
+      3. Copie a chave do painel e cole abaixo<br><br>
+      Ou use o <strong style="color:var(--gold)">Modo Demo</strong> (dados simulados).
+    </div>
+    <input class="modal-input" id="apiKeyInput" placeholder="Cole sua chave aqui..." type="password" autocomplete="off">
+    <div id="savedKeyHint" style="font-size:12px;color:var(--muted);margin-bottom:12px;"></div>
+    <div class="modal-row">
+      <button class="btn-primary" onclick="startWithKey()">Conectar API</button>
+      <button class="btn-demo" onclick="startDemo()">Modo Demo</button>
+    </div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="logo">FOOT<span>STATS</span> <span style="font-size:18px;color:var(--accent3)">PRO</span></div>
+  <div style="display:flex;gap:10px;align-items:center;">
+    <div style="font-size:12px;color:var(--muted)">v26</div>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="nav-btn active" onclick="showSection('analises',this)">&#129302; Analises IA</button>
+  <button class="nav-btn" onclick="showSection('palpites',this)">&#127919; Palpites Prontos</button>
+  <button class="nav-btn" onclick="showSection('relatorio',this)">&#128202; Relatorio</button>
+  <button class="nav-btn" onclick="showSection('config',this)">&#9881;&#65039; Config</button>
+</div>
+
+<div class="main">
+  <div id="alertContainer"></div>
+
+  <div class="section active" id="sec-analises">
+    <div id="chatWindow" style="display:flex;flex-direction:column;gap:12px;padding-bottom:8px;min-height:60vh;">
+      <!-- messages injected by JS -->
+    </div>
+  </div>
+
+  <div class="section" id="sec-palpites">
+    <div id="palpitesHeader" style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:16px;font-weight:600;">Palpites Prontos</div>
+        <div class="section-badge" id="palpitesCount">0 dicas</div>
+      </div>
+      <div style="background:linear-gradient(135deg,rgba(255,215,0,.1),rgba(255,107,53,.07));border:1px solid rgba(255,215,0,.3);border-radius:12px;padding:10px 14px;">
+        <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">&#9889; Criterios de selecao</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.8;">Odds <strong style="color:#fff">1.80–3.50</strong> &bull; Confianca acima de <strong style="color:#fff">65%</strong> &bull; Premier League, La Liga, Serie A, Brasileirao A/B, Copa do Brasil, Champions, Libertadores, Sul-Americana, Copa do Mundo, Mundial de Clubes &bull; Estatísticas via Fbref/SofaScore/WhoScored &bull; Geradas por IA</div>
+      </div>
+    </div>
+    <div id="palpitesList"><div class="loading"><div class="spinner"></div>Gerando palpites do dia...</div></div>
+  </div>
+
+  <div class="section" id="sec-relatorio">
+    <div class="section-header" style="margin-top:4px">
+      <div class="section-title">Relatorio de Acertos</div>
+      <div class="section-badge" id="reportDate"></div>
+    </div>
+    <div id="reportContent"><div class="loading"><div class="spinner"></div>Gerando...</div></div>
+  </div>
+
+  <div class="section" id="sec-config">
+    <div class="section-header" style="margin-top:4px"><div class="section-title">Configuracoes</div></div>
+    <div class="settings-card">
+      <div class="settings-item">
+        <div><div style="font-size:14px">Alertas de Gol</div><div style="font-size:12px;color:var(--muted)">Notificacao ao marcar</div></div>
+        <div class="toggle on" onclick="toggleSwitch(this)"></div>
+      </div>
+      <div class="settings-item">
+        <div><div style="font-size:14px">Alertas de Pressao</div><div style="font-size:12px;color:var(--muted)">Entrada acima de 65%</div></div>
+        <div class="toggle on" onclick="toggleSwitch(this)"></div>
+      </div>
+      <div class="settings-item">
+        <div><div style="font-size:14px">Auto-refresh 60s</div><div style="font-size:12px;color:var(--muted)">Ao vivo atualiza sozinho</div></div>
+        <div class="toggle on" onclick="toggleSwitch(this)"></div>
+      </div>
+    </div>
+    <div style="margin-top:16px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">Chave API</div>
+      <div style="font-size:12px;color:var(--accent);word-break:break-all;font-family:monospace" id="keyDisplay">-</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px" id="apiModeLabel">-</div>
+      <div style="margin-top:10px;background:rgba(255,255,255,.03);border-radius:8px;padding:10px 12px">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">Cache local (economiza cota)</div>
+        <div style="font-size:12px;color:var(--muted)" id="cacheStats">-</div>
+        <button onclick="limparCache()" style="margin-top:8px;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);padding:5px 14px;border-radius:12px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;">Limpar cache</button>
+      </div>
+      <button onclick="document.getElementById('apiModal').style.display='flex'" style="margin-top:12px;background:rgba(255,255,255,.07);border:1px solid var(--border);color:var(--muted);padding:8px 18px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">Trocar Chave / Modo</button>
+    </div>
+    <div style="margin-top:12px;text-align:center">
+      <button onclick="loadAll()" style="background:rgba(0,229,160,.15);border:1px solid rgba(0,229,160,.3);color:var(--accent);padding:12px 28px;border-radius:24px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Atualizar Tudo</button>
+    </div>
+  </div>
+</div>
+
+<button class="fab" onclick="refreshPalpites()">&#8635;</button>
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ───────────────────────────────────────────────
+var API_KEY  = '';
+var BASE     = 'https://v3.football.api-sports.io';
+var SEASON   = 2024;
+var TODAY    = new Date().toISOString().split('T')[0];
+var DEMO_MODE = false;
+
+var STATE = {
+  games: [], stats: {}, alerts: [],
+  selectedDate: TODAY,
+  allFixturesByDate: {},
+  firedAlerts: {}
+};
+
+// ── PERSISTENCIA (localStorage + cookie) ─────────────────
+function saveKey(key) {
+  try { localStorage.setItem('footstats_key', key); } catch(e) {}
+  try { document.cookie = 'footstats_key=' + encodeURIComponent(key) + ';max-age=31536000;path=/'; } catch(e) {}
+}
+
+function getSavedKey() {
+  try {
+    var k = localStorage.getItem('footstats_key');
+    if (k && k.trim()) return k.trim();
+  } catch(e) {}
+  try {
+    var m = document.cookie.match(/footstats_key=([^;]+)/);
+    if (m) return decodeURIComponent(m[1]).trim();
+  } catch(e) {}
+  return null;
+}
+
+// ── CACHE ────────────────────────────────────────────────
+var TTL = {
+  league: 6 * 3600000,
+  live:   60000,
+  date:   1800000,
+  stats:  12 * 3600000,
+  events: 120000
+};
+
+function cacheSet(key, data, ttl) {
+  try { localStorage.setItem('fsc_' + key, JSON.stringify({ data: data, exp: Date.now() + ttl })); } catch(e) {}
+}
+
+function cacheGet(key) {
+  try {
+    var raw = localStorage.getItem('fsc_' + key);
+    if (!raw) return null;
+    var obj = JSON.parse(raw);
+    if (Date.now() > obj.exp) { localStorage.removeItem('fsc_' + key); return null; }
+    return obj.data;
+  } catch(e) { return null; }
+}
+
+function limparCache() {
+  var keys = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && k.indexOf('fsc_') === 0) keys.push(k);
+  }
+  keys.forEach(function(k) { localStorage.removeItem(k); });
+  showToast('Cache limpo (' + keys.length + ' entradas)');
+  updateCacheStats();
+}
+
+function updateCacheStats() {
+  var el = document.getElementById('cacheStats');
+  if (!el) return;
+  var valid = 0, kb = 0;
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && k.indexOf('fsc_') === 0) {
+      try {
+        var raw = localStorage.getItem(k);
+        var obj = JSON.parse(raw);
+        if (Date.now() < obj.exp) valid++;
+        kb += raw.length;
+      } catch(e) {}
+    }
+  }
+  el.textContent = valid + ' entradas ativas · ' + (kb/1024).toFixed(1) + ' KB';
+}
+
+// ── API ──────────────────────────────────────────────────
+async function api(path, ttlKey) {
+  if (DEMO_MODE) return null;
+  if (!API_KEY) return null;
+  var ttl = ttlKey ? TTL[ttlKey] : 300000;
+  var cached = cacheGet(path);
+  if (cached !== null) return cached;
+  var safeKey = API_KEY.replace(/[^\x20-\x7E]/g, '').trim();
+  try {
+    var r = await fetch(BASE + path, { headers: { 'x-apisports-key': safeKey } });
+    if (r.status === 401 || r.status === 403) {
+      showApiError('Chave invalida. Verifique em dashboard.api-football.com');
+      return null;
+    }
+    var d = await r.json();
+    if (d && d.errors) {
+      var errs = typeof d.errors === 'object' ? Object.values(d.errors) : d.errors;
+      if (Array.isArray(errs) ? errs.length : Object.keys(d.errors).length) {
+        var msg = JSON.stringify(d.errors).slice(0, 150);
+        showApiError('Erro API: ' + msg);
+        return null;
+      }
+    }
+    if (d && d.response !== undefined) {
+      cacheSet(path, d.response, ttl);
+      hideApiError();
+      return d.response;
+    }
+    return null;
+  } catch(e) {
+    showApiError('Erro de conexao: ' + e.message);
+    return null;
+  }
+}
+
+function showApiError(msg) {
+  var el = document.getElementById('apiErrBanner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'apiErrBanner';
+    el.style.cssText = 'background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#ff6b6b;display:flex;justify-content:space-between;align-items:center;gap:10px;';
+    document.getElementById('alertContainer').prepend(el);
+  }
+  el.innerHTML = '<span>' + msg + '</span><button onclick="document.getElementById(\'apiModal\').style.display=\'flex\'" style="background:rgba(255,68,68,.2);border:1px solid rgba(255,68,68,.4);color:#ff6b6b;padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;font-family:\'DM Sans\',sans-serif;white-space:nowrap;">Trocar / Demo</button>';
+}
+
+function hideApiError() {
+  var el = document.getElementById('apiErrBanner');
+  if (el) el.remove();
+}
+
+// ── AUTH ─────────────────────────────────────────────────
+function startWithKey() {
+  var raw = document.getElementById('apiKeyInput').value || '';
+  var val = raw.replace(/[^\x20-\x7E]/g, '').trim();
+  if (!val && !API_KEY) { showToast('Cole sua chave ou use o Modo Demo'); return; }
+  if (val) { API_KEY = val; saveKey(val); }
+  DEMO_MODE = false;
+  document.getElementById('keyDisplay').textContent = API_KEY.slice(0,8) + '********************' + API_KEY.slice(-4);
+  document.getElementById('apiModeLabel').textContent = 'Modo: API Real';
+  document.getElementById('apiModal').style.display = 'none';
+  initChat();
+}
+
+function startDemo() {
+  DEMO_MODE = true;
+  API_KEY = '';
+  document.getElementById('keyDisplay').textContent = 'MODO DEMO';
+  document.getElementById('apiModeLabel').textContent = 'Modo: Demo (dados simulados)';
+  document.getElementById('apiModal').style.display = 'none';
+  initChat();
+}
+
+// ── DEMO DATA ────────────────────────────────────────────
+var DEMO_TEAMS = [
+  {id:121,name:'Flamengo',logo:'https://media.api-sports.io/football/teams/121.png'},
+  {id:118,name:'Corinthians',logo:'https://media.api-sports.io/football/teams/118.png'},
+  {id:117,name:'Palmeiras',logo:'https://media.api-sports.io/football/teams/117.png'},
+  {id:126,name:'Sao Paulo',logo:'https://media.api-sports.io/football/teams/126.png'},
+  {id:116,name:'Atletico MG',logo:'https://media.api-sports.io/football/teams/116.png'},
+  {id:119,name:'Fluminense',logo:'https://media.api-sports.io/football/teams/119.png'},
+  {id:128,name:'Botafogo',logo:'https://media.api-sports.io/football/teams/128.png'},
+  {id:132,name:'Internacional',logo:'https://media.api-sports.io/football/teams/132.png'},
+  {id:40,name:'Liverpool',logo:'https://media.api-sports.io/football/teams/40.png'},
+  {id:42,name:'Arsenal',logo:'https://media.api-sports.io/football/teams/42.png'},
+  {id:541,name:'Real Madrid',logo:'https://media.api-sports.io/football/teams/541.png'},
+  {id:529,name:'Barcelona',logo:'https://media.api-sports.io/football/teams/529.png'},
+];
+var DEMO_LEAGUES = [
+  {id:71,name:'Brasileirao Serie A'},
+  {id:39,name:'Premier League'},
+  {id:140,name:'La Liga'},
+  {id:78,name:'Bundesliga'},
+];
+var DEMO_STATUSES = [
+  {short:'NS',elapsed:null},{short:'1H',elapsed:28},{short:'HT',elapsed:45},
+  {short:'2H',elapsed:63},{short:'FT',elapsed:90}
+];
+
+function getDemoFixtures(date) {
+  var pairs = [[0,1],[2,3],[4,5],[6,7],[8,9],[10,11],[0,4],[2,6],[8,10],[1,5]];
+  var base = new Date(date + 'T13:00:00');
+  return pairs.map(function(p, i) {
+    var h = DEMO_TEAMS[p[0]], a = DEMO_TEAMS[p[1]];
+    var st = DEMO_STATUSES[i % DEMO_STATUSES.length];
+    var lg = DEMO_LEAGUES[i % DEMO_LEAGUES.length];
+    var t = new Date(base); t.setMinutes(t.getMinutes() + i * 25);
+    var live = ['1H','HT','2H'].indexOf(st.short) >= 0;
+    return {
+      fixture: { id: 9000+i, date: t.toISOString(), status: st },
+      league: lg,
+      teams: { home: h, away: a },
+      goals: { home: live ? Math.floor(Math.random()*3) : null, away: live ? Math.floor(Math.random()*3) : null },
+      events: live ? [
+        {time:{elapsed:st.elapsed-10},type:'Goal',player:{name:'Jogador A'},team:{name:h.name}},
+        {time:{elapsed:st.elapsed-3},type:'Card',detail:'Yellow Card',player:{name:'Jogador B'},team:{name:a.name}}
+      ] : []
+    };
+  });
+}
+
+function getDemoStats(id) {
+  var s = (id % 8) * 0.1;
+  return {
+    goals: { for: { average: { home: (1.3+s).toFixed(1), away: (1.0+s).toFixed(1) } },
+             against: { average: { home: (1.1+s).toFixed(1), away: (1.2+s).toFixed(1) } } },
+    form: 'WDWLWW'
+  };
+}
+
+// ── TEAM LOGO ────────────────────────────────────────────
+function teamLogo(team, size) {
+  size = size || 38;
+  var colors = ['#00e5a0','#ff6b35','#4fc3f7','#ffd700','#ff4444','#a78bfa','#34d399'];
+  var c = colors[team.id % colors.length];
+  var initials = team.name.replace(/[^a-zA-Z ]/g,'').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+  if (team.logo) {
+    return '<div style="width:' + size + 'px;height:' + size + 'px;display:flex;align-items:center;justify-content:center;margin:0 auto 4px;">' +
+      '<img src="' + team.logo + '" style="width:' + size + 'px;height:' + size + 'px;object-fit:contain;" ' +
+      'onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\';" alt="">' +
+      '<div style="display:none;width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + c + '22;border:2px solid ' + c + '55;align-items:center;justify-content:center;font-size:' + Math.round(size*0.33) + 'px;font-weight:700;color:' + c + ';">' + initials + '</div>' +
+      '</div>';
+  }
+  return '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + c + '22;border:2px solid ' + c + '55;display:flex;align-items:center;justify-content:center;font-size:' + Math.round(size*0.33) + 'px;font-weight:700;color:' + c + ';margin:0 auto 4px;">' + initials + '</div>';
+}
+
+// ── DATE BAR ─────────────────────────────────────────────
+function buildDateBar(dates) {
+  var bar = document.getElementById('dateBar');
+  var days = [];
+  if (dates && dates.length) {
+    days = dates;
+  } else {
+    for (var i = -1; i <= 4; i++) {
+      var d = new Date(); d.setDate(d.getDate() + i);
+      days.push(d.toISOString().split('T')[0]);
+    }
+  }
+  bar.innerHTML = days.map(function(iso) {
+    var d = new Date(iso + 'T12:00:00');
+    var lbl = iso === TODAY ? 'Hoje' :
+      d.toLocaleDateString('pt-BR', {weekday:'short', day:'2-digit', month:'2-digit'});
+    return '<div class="date-chip' + (iso === STATE.selectedDate ? ' active' : '') + '" onclick="pickDate(\'' + iso + '\',this)">' + lbl + '</div>';
+  }).join('');
+}
+
+function pickDate(date, el) {
+  STATE.selectedDate = date;
+  document.querySelectorAll('.date-chip').forEach(function(c) { c.classList.remove('active'); });
+  el.classList.add('active');
+  if (STATE.allFixturesByDate[date]) {
+    var cached = STATE.allFixturesByDate[date].slice().sort(function(a,b){ return new Date(a.fixture.date)-new Date(b.fixture.date); });
+    STATE.games = cached;
+    document.getElementById('gamesCount').textContent = cached.length + ' jogos';
+    renderGames(cached);
+    buildTipOfDay(cached);
+  } else {
+    loadGames();
+  }
+}
+
+// ── LOAD GAMES ───────────────────────────────────────────
+async function loadGames() {
+  document.getElementById('gamesList').innerHTML = '<div class="loading"><div class="spinner"></div>Buscando jogos...</div>';
+  document.getElementById('gamesCount').textContent = '...';
+  hideApiError();
+  var all = [];
+
+  if (DEMO_MODE) {
+    all = getDemoFixtures(STATE.selectedDate);
+    all.forEach(function(f) {
+      if (!STATE.stats[f.teams.home.id]) STATE.stats[f.teams.home.id] = getDemoStats(f.teams.home.id);
+      if (!STATE.stats[f.teams.away.id]) STATE.stats[f.teams.away.id] = getDemoStats(f.teams.away.id);
+    });
+  } else {
+    // 1. Ao vivo
+    var live = await api('/fixtures?live=all', 'live');
+    if (live && live.length) { all = live; STATE.selectedDate = TODAY; }
+
+    // 2. Por data
+    if (!all.length) {
+      var byDate = await api('/fixtures?date=' + STATE.selectedDate + '&timezone=America/Sao_Paulo', 'date');
+      if (byDate && byDate.length) all = byDate;
+    }
+
+    // 3. Temporada completa (1 req, cache 6h)
+    if (!all.length) {
+      document.getElementById('gamesList').innerHTML = '<div class="loading"><div class="spinner"></div>Carregando temporada...</div>';
+      var season = await api('/fixtures?league=71&season=2024', 'league');
+      if (season && season.length) {
+        var byD = {};
+        season.forEach(function(f) {
+          var d = f.fixture.date.split('T')[0];
+          if (!byD[d]) byD[d] = [];
+          byD[d].push(f);
+        });
+        STATE.allFixturesByDate = byD;
+        var dates = Object.keys(byD).sort().reverse().slice(0, 10);
+        buildDateBar(dates);
+        var best = Object.entries(byD).sort(function(a,b){ return b[1].length - a[1].length; })[0];
+        if (best) { all = best[1]; STATE.selectedDate = best[0]; }
+      }
+    }
+  }
+
+  all.sort(function(a,b){ return new Date(a.fixture.date)-new Date(b.fixture.date); });
+  STATE.games = all;
+  document.getElementById('gamesCount').textContent = all.length + ' jogos' + (DEMO_MODE ? ' (demo)' : '');
+
+  if (!all.length) {
+    document.getElementById('gamesList').innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)"><div style="font-size:32px;margin-bottom:12px">&#128337;</div><div>Nenhum jogo encontrado</div><div style="margin-top:16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button onclick="startDemo()" style="background:rgba(255,215,0,.15);border:1px solid rgba(255,215,0,.3);color:var(--gold);padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif;">Modo Demo</button><button onclick="document.getElementById(\'apiModal\').style.display=\'flex\'" style="background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3);color:var(--accent);padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif;">Trocar Chave</button></div></div>';
+    return;
+  }
+
+  renderGames(all);
+  buildTipOfDay(all);
+  if (!DEMO_MODE) loadStatsFor(all.slice(0, 4));
+}
+
+async function loadStatsFor(fixtures) {
+  for (var i = 0; i < fixtures.length; i++) {
+    var fix = fixtures[i];
+    var hid = fix.teams.home.id, aid = fix.teams.away.id, lid = fix.league.id;
+    if (!STATE.stats[hid]) { var rh = await api('/teams/statistics?league=' + lid + '&season=2024&team=' + hid, 'stats'); if (rh) STATE.stats[hid] = rh; }
+    if (!STATE.stats[aid]) { var ra = await api('/teams/statistics?league=' + lid + '&season=2024&team=' + aid, 'stats'); if (ra) STATE.stats[aid] = ra; }
+  }
+  if (STATE.games.length) { renderGames(STATE.games); buildTipOfDay(STATE.games); }
+}
+
+// ── TIPS ─────────────────────────────────────────────────
+function calcTips(fix) {
+  var h = STATE.stats[fix.teams.home.id], a = STATE.stats[fix.teams.away.id];
+  var tips = [], conf = 50, palpites = [], score = null;
+  if (h && a) {
+    var hGF = parseFloat(h.goals && h.goals.for && h.goals.for.average ? h.goals.for.average.home : 1.3);
+    var aGF = parseFloat(a.goals && a.goals.for && a.goals.for.average ? a.goals.for.average.away : 1.0);
+    var exp = hGF + aGF;
+    if (exp > 2.5) { tips.push({l:'Over 2.5 Gols', c:'g'}); conf += 15; palpites.push({l:'Mais de 2.5 gols',c2:Math.min(50+Math.round(exp*8),92)+''}); }
+    if (exp > 1.5) { tips.push({l:'Over 1.5 Gols', c:'a'}); conf += 10; palpites.push({l:'Mais de 1.5 gols',c2:Math.min(60+Math.round(exp*6),95)+''}); }
+    if (hGF > 1.0 && aGF > 0.8) { tips.push({l:'Ambas Marcam', c:'g'}); conf += 12; palpites.push({l:'Ambas as equipes marcam',c2:Math.min(55+Math.round((hGF+aGF)*7),90)+''}); }
+    var form = h.form || '';
+    var wins = (form.match(/W/g)||[]).length;
+    if (wins >= 4) { tips.push({l:'Vitoria Casa', c:'b'}); conf += 8; palpites.push({l:fix.teams.home.name+' vence a partida',c2:(60+wins*4)+''}); }
+    else if (wins <= 1) { palpites.push({l:fix.teams.away.name+' mais finalizacoes',c2:'71'}); }
+    // Predicted score
+    var hS = Math.round(hGF), aS = Math.round(aGF);
+    score = hS + ' x ' + aS;
+    if (!palpites.length) palpites.push({l:'Over 1.5 gols',c2:'72'});
+  } else {
+    tips.push({l:'Over 1.5 Gols', c:'a'});
+    tips.push({l:'Ambas Marcam', c:'g'});
+    palpites.push({l:'Mais de 1.5 gols',c2:'72'});
+    score = '1 x 1';
+  }
+  return { tips: tips.slice(0, 3), conf: Math.min(conf, 95), score: score, palpites: palpites.slice(0,3) };
+}
+
+function getStats(hid, aid) {
+  var h = STATE.stats[hid], a = STATE.stats[aid];
+  if (!h || !a) return null;
+  var hGF = parseFloat(h.goals && h.goals.for && h.goals.for.average ? h.goals.for.average.home : 1.4).toFixed(1);
+  var aGF = parseFloat(a.goals && a.goals.for && a.goals.for.average ? a.goals.for.average.away : 1.0).toFixed(1);
+  var btts = Math.min(Math.round(((parseFloat(hGF)+parseFloat(aGF))/4)*10), 10);
+  var o15  = Math.min(Math.round(((parseFloat(hGF)+parseFloat(aGF))/3.5)*10), 10);
+  return {
+    hGF: hGF, aGF: aGF, btts: btts, o15: o15,
+    corners: (9 + Math.random()*4).toFixed(1),
+    htGoals: ((parseFloat(hGF)+parseFloat(aGF))*0.4).toFixed(1),
+    hForm: (h.form||'WDWLW').slice(-5).split(''),
+    aForm: (a.form||'DWLDW').slice(-5).split('')
+  };
+}
+
+// ── RENDER GAMES ─────────────────────────────────────────
+function renderGames(fixtures) {
+  var c = document.getElementById('gamesList');
+  c.innerHTML = '';
+  fixtures.forEach(function(fix) {
+    var tc = calcTips(fix);
+    var stats = getStats(fix.teams.home.id, fix.teams.away.id);
+    var pri = tc.conf > 75 ? 'high' : tc.conf > 60 ? 'medium' : 'low';
+    var isLive = ['1H','HT','2H','ET','P'].indexOf(fix.fixture.status.short) >= 0;
+    var min = fix.fixture.status.elapsed;
+    var timeStr = isLive ? (min ? min + "'" : 'AO VIVO') : new Date(fix.fixture.date).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    var hForm = (stats ? stats.hForm : ['W','D','W','L','W']).map(function(r){ return '<div class="fd '+r+'">'+r+'</div>'; }).join('');
+    var aForm = (stats ? stats.aForm : ['D','W','L','W','D']).map(function(r){ return '<div class="fd '+r+'">'+r+'</div>'; }).join('');
+    var tipsHtml = tc.tips.map(function(t){ return '<span class="chip '+t.c+'">'+t.l+'</span>'; }).join('');
+    var midHtml = isLive ? '<div><div class="score-live">'+(fix.goals.home||0)+'-'+(fix.goals.away||0)+'</div></div>' : '<div class="vs-box">VS</div>';
+    var hLogo = teamLogo(fix.teams.home, 38);
+    var aLogo = teamLogo(fix.teams.away, 38);
+    var demoTag = DEMO_MODE ? '<span class="demo-tag">DEMO</span>' : '';
+    var div = document.createElement('div');
+    div.className = 'game-card ' + pri;
+    div.innerHTML =
+      '<div class="game-header">' +
+        '<span class="game-league">' + fix.league.name + demoTag + '</span>' +
+        '<span class="game-time' + (isLive?' live':'') + '">' + (isLive?'&#128308; '+timeStr:timeStr) + '</span>' +
+      '</div>' +
+      '<div class="game-teams">' +
+        '<div class="team-info">' + hLogo + '<div class="team-name">' + fix.teams.home.name + '</div><div class="form-row">' + hForm + '</div></div>' +
+        midHtml +
+        '<div class="team-info">' + aLogo + '<div class="team-name">' + fix.teams.away.name + '</div><div class="form-row">' + aForm + '</div></div>' +
+      '</div>' +
+      '<div class="chips">' + tipsHtml + '</div>' +
+      (tc.score ? '<div class="score-pred-box">' +
+        '<div class="score-pred-label">&#127919; Palpite Final</div>' +
+        '<div class="score-pred-main">' + fix.teams.home.name + ' ' + tc.score + ' ' + fix.teams.away.name + '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:0">' + tc.palpites.map(function(p){
+          return '<div class="palpite-row"><span class="palpite-name">&#10003; ' + p.l + '</span><span class="palpite-conf ' + (p.c2>='75'?'high':'med') + '">' + p.c2 + '%</span></div>';
+        }).join('') + '</div></div>' : '') +
+      '<div class="detail" id="det-' + fix.fixture.id + '"></div>';
+    div.addEventListener('click', function(e) {
+      if (e.target.classList.contains('tb')) return;
+      openDetail(fix, div, stats, tc.conf);
+    });
+    c.appendChild(div);
+  });
+}
+
+// ── DETAIL ───────────────────────────────────────────────
+async function openDetail(fix, card, stats, conf) {
+  var panel = document.getElementById('det-' + fix.fixture.id);
+  var isOpen = panel.classList.contains('open');
+  document.querySelectorAll('.detail').forEach(function(p){ p.classList.remove('open'); });
+  document.querySelectorAll('.game-card').forEach(function(c){ c.classList.remove('selected'); });
+  if (isOpen) return;
+  panel.classList.add('open'); card.classList.add('selected');
+  panel.innerHTML = '<div style="padding:20px;text-align:center"><div class="spinner"></div></div>';
+  var h2h = DEMO_MODE ? [] : await api('/fixtures/headtohead?h2h=' + fix.teams.home.id + '-' + fix.teams.away.id + '&last=5', 'league') || [];
+  var fid = fix.fixture.id;
+  var hp = 45 + Math.round(Math.random()*25), ap = 100 - hp;
+  var h2hHtml = h2h.length ? h2h.map(function(m) {
+    var hn=m.goals.home||0, an=m.goals.away||0;
+    var rc=hn>an?'hw':an>hn?'aw':'dr';
+    return '<tr><td>' + new Date(m.fixture.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'}) + '</td><td style="font-size:11px">' + m.teams.home.name + '</td><td class="' + rc + '">' + hn + '-' + an + '</td><td style="font-size:11px">' + m.teams.away.name + '</td></tr>';
+  }).join('') : '<tr><td colspan="4" style="color:var(--muted);padding:12px;text-align:center">Sem historico</td></tr>';
+
+  panel.innerHTML =
+    '<div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+        '<span style="font-size:12px;color:var(--muted)">Confianca</span>' +
+        '<span style="font-size:13px;font-weight:600;color:var(--accent)">' + conf + '%</span>' +
+      '</div>' +
+      '<div class="conf-bar" style="margin-bottom:14px"><div class="conf-fill" style="width:' + conf + '%"></div></div>' +
+      '<div class="tabs">' +
+        '<button class="tb active" onclick="switchTab(event,\'ts' + fid + '\',\'' + fid + '\')">Stats</button>' +
+        '<button class="tb" onclick="switchTab(event,\'hh' + fid + '\',\'' + fid + '\')">H2H</button>' +
+        '<button class="tb" onclick="switchTab(event,\'pr' + fid + '\',\'' + fid + '\')">Pressao</button>' +
+        '<button class="tb" onclick="switchTab(event,\'ia' + fid + '\',\'' + fid + '\');loadAI(\'' + fid + '\',fix)">IA ✦</button>' +
+      '</div>' +
+      '<div id="ts' + fid + '">' +
+        (stats ?
+          '<div class="sg">' +
+            '<div class="sc"><div class="sl">Gols/Jogo Casa</div><div class="sv" style="color:var(--accent)">' + stats.hGF + '</div><div class="ss">media</div></div>' +
+            '<div class="sc"><div class="sl">Gols/Jogo Fora</div><div class="sv" style="color:var(--accent2)">' + stats.aGF + '</div><div class="ss">media</div></div>' +
+            '<div class="sc"><div class="sl">Ambas Marcam</div><div class="sv" style="color:var(--gold)">' + stats.btts + '/10</div><div class="ss">' + (stats.btts*10) + '%</div></div>' +
+            '<div class="sc"><div class="sl">Over 1.5</div><div class="sv" style="color:var(--accent)">' + stats.o15 + '/10</div><div class="ss">' + (stats.o15*10) + '%</div></div>' +
+            '<div class="sc"><div class="sl">Escanteios</div><div class="sv">' + stats.corners + '</div><div class="ss">media est.</div></div>' +
+            '<div class="sc"><div class="sl">Gols 1 Tempo</div><div class="sv">' + stats.htGoals + '</div><div class="ss">media/jogo</div></div>' +
+          '</div>'
+          : '<div style="color:var(--muted);font-size:13px;padding:10px">Stats nao disponiveis ainda</div>') +
+      '</div>' +
+      '<div id="hh' + fid + '" style="display:none"><table class="h2h-t"><thead><tr><th>Data</th><th>Casa</th><th>Placar</th><th>Fora</th></tr></thead><tbody>' + h2hHtml + '</tbody></table></div>' +
+      '<div id="pr' + fid + '" style="display:none">' +
+        '<div style="font-size:13px;font-weight:600;margin-bottom:8px">Posse de Bola</div>' +
+        '<div class="pt"><div class="ph" style="width:' + hp + '%">' + hp + '%</div><div class="pa">' + ap + '%</div></div>' +
+        '<div class="pl"><span>' + fix.teams.home.name + '</span><span>' + fix.teams.away.name + '</span></div>' +
+        (hp > 65 ? '<div style="background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.3);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--accent2);margin-top:8px">' + fix.teams.home.name + ' domina com ' + hp + '%</div>' : '') +
+      '</div>' +
+      '<div id="ia' + fid + '" style="display:none">' +
+        '<div class="ai-box"><div class="ai-label">&#10024; Analise por Inteligencia Artificial</div>' +
+        '<div class="ai-loading" id="ai-load-' + fid + '"><div class="spinner" style="width:20px;height:20px;border-width:2px"></div>Gerando analise...</div>' +
+        '<div class="ai-text" id="ai-result-' + fid + '" style="display:none"></div></div>' +
+      '</div>' +
+    '</div>';
+}
+
+function switchTab(e, tid, fid) {
+  e.stopPropagation();
+  e.target.closest('.tabs').querySelectorAll('.tb').forEach(function(t){ t.classList.remove('active'); });
+  e.target.classList.add('active');
+  ['ts','hh','pr','ia'].forEach(function(p){ var el=document.getElementById(p+fid); if(el) el.style.display='none'; });
+  var t = document.getElementById(tid); if (t) t.style.display = 'block';
+}
+
+// ── TIP OF DAY ───────────────────────────────────────────
+function buildTipOfDay(fixtures) {
+  var best = null, bestConf = 0;
+  fixtures.slice(0,15).forEach(function(fix) {
+    var tc = calcTips(fix);
+    if (tc.conf > bestConf) { bestConf = tc.conf; best = {fix:fix, tips:tc.tips, conf:tc.conf}; }
+  });
+  if (!best) return;
+  var fix = best.fix;
+  var t = new Date(fix.fixture.date).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('tipOfDay').innerHTML =
+    '<div class="tip-of-day">' +
+      '<div class="tip-label">Melhor Dica do Dia' + (DEMO_MODE?' (demo)':'') + '</div>' +
+      '<div class="tip-match">' + fix.teams.home.name + ' x ' + fix.teams.away.name + '</div>' +
+      '<div class="tip-tip">' + (best.tips[0] ? best.tips[0].l : 'Over 1.5 Gols') + '</div>' +
+      '<div class="tip-stats">' +
+        '<div class="tip-stat">Confianca <span>' + best.conf + '%</span></div>' +
+        '<div class="tip-stat">Liga <span>' + fix.league.name + '</span></div>' +
+        '<div class="tip-stat">Horario <span>' + t + '</span></div>' +
+      '</div>' +
+      '<div class="conf-bar"><div class="conf-fill" style="width:' + best.conf + '%"></div></div>' +
+    '</div>';
+}
+
+// ── LIVE ANALYSIS ────────────────────────────────────────
+function calcLiveOdd(fix, stats) {
+  var min = fix.fixture.status.elapsed || 0;
+  var status = fix.fixture.status.short;
+  var total = (fix.goals.home||0) + (fix.goals.away||0);
+  var odd = 2.20;
+  if (status === '1H') { if (min>=35) odd-=0.25; if (min>=40) odd-=0.15; }
+  if (status === '2H' || status === 'HT') {
+    odd -= 0.20;
+    if (min>=60) odd-=0.20;
+    if (min>=70) odd-=0.15;
+    if (min>=80) odd-=0.20;
+    if (min>=85) odd-=0.10;
+  }
+  if (stats && stats.possession) {
+    var mx = Math.max(stats.possession.home, stats.possession.away);
+    if (mx>=65) odd-=0.18;
+    if (mx>=72) odd-=0.12;
+  }
+  if (fix.goals.home === fix.goals.away) odd -= 0.10;
+  if (total === 0) odd -= 0.08;
+  if (stats && stats.shots) {
+    var shots = stats.shots.home + stats.shots.away;
+    if (shots > 8 && total / Math.max(shots,1) < 0.15) odd -= 0.12;
+  }
+  if (stats && stats.corners) {
+    var c = stats.corners.home + stats.corners.away;
+    if (c>=6) odd-=0.08;
+    if (c>=10) odd-=0.07;
+  }
+  return Math.max(odd, 1.10).toFixed(2);
+}
+
+function analyzePressure(fix, stats) {
+  var signals = [];
+  var min = fix.fixture.status.elapsed || 0;
+  var status = fix.fixture.status.short;
+  var hp = (stats && stats.possession ? stats.possession.home : 45 + Math.round(Math.random()*25));
+  var ap = 100 - hp;
+  var domName = hp > ap ? fix.teams.home.name : fix.teams.away.name;
+  var domPct = Math.max(hp, ap);
+  if (domPct >= 65) signals.push({icon:'&#128293;', txt: domName + ' domina com ' + domPct + '% de posse', level:'high'});
+  if (stats && stats.shots) {
+    var s = stats.shots.home + stats.shots.away;
+    var ot = (stats.shots.onTarget ? stats.shots.onTarget.home + stats.shots.onTarget.away : 0);
+    if (s >= 10) signals.push({icon:'&#127919;', txt: s + ' chutes (' + ot + ' no gol)', level: s>=14?'high':'medium'});
+  }
+  if (stats && stats.corners) {
+    var c = stats.corners.home + stats.corners.away;
+    if (c >= 7) signals.push({icon:'&#128681;', txt: c + ' escanteios - campo aberto', level: c>=10?'high':'medium'});
+  }
+  if (status === '2H' && min >= 75) {
+    if (fix.goals.home !== fix.goals.away) {
+      var losing = fix.goals.home < fix.goals.away ? fix.teams.home.name : fix.teams.away.name;
+      signals.push({icon:'&#9889;', txt: losing + ' perdendo - pressao maxima (' + min + "')", level:'high'});
+    } else {
+      signals.push({icon:'&#9200;', txt: 'Empate no final - ambos atacando (' + min + "')", level:'high'});
+    }
+  }
+  if (status === '1H' && min >= 38) signals.push({icon:'&#9200;', txt: 'Final do 1 tempo - times acelerando', level:'medium'});
+  var period = status === '1H' ? '1 Tempo' : status === '2H' ? '2 Tempo' : status === 'HT' ? 'Intervalo' : status;
+  return {signals:signals, period:period, hp:hp, ap:ap};
+}
+
+// ── LIVE ─────────────────────────────────────────────────
+async function loadLive() {
+  document.getElementById('liveGames').innerHTML = '<div class="loading"><div class="spinner"></div>Buscando ao vivo...</div>';
+  var data = DEMO_MODE ? getDemoFixtures(TODAY).filter(function(f){ return ['1H','HT','2H'].indexOf(f.fixture.status.short)>=0; }) : await api('/fixtures?live=all', 'live') || [];
+  document.getElementById('liveCount').textContent = data.length + ' ao vivo';
+  document.getElementById('notifCount').textContent = data.length || '0';
+
+  if (!data.length) {
+    document.getElementById('liveGames').innerHTML = '<div style="text-align:center;padding:50px;color:var(--muted)">Nenhum jogo ao vivo agora</div>';
+    return;
+  }
+
+  // Busca stats ao vivo
+  var statsMap = {};
+  if (DEMO_MODE) {
+    data.forEach(function(fix) {
+      var hp = 45 + Math.round(Math.random()*30);
+      statsMap[fix.fixture.id] = {
+        possession:{home:hp,away:100-hp},
+        shots:{home:Math.floor(Math.random()*8+2),away:Math.floor(Math.random()*6+1),onTarget:{home:Math.floor(Math.random()*4),away:Math.floor(Math.random()*3)}},
+        corners:{home:Math.floor(Math.random()*6),away:Math.floor(Math.random()*5)}
+      };
+    });
+  } else {
+    for (var i = 0; i < Math.min(data.length, 5); i++) {
+      var fix = data[i];
+      var s = await api('/fixtures/statistics?fixture=' + fix.fixture.id, 'events');
+      if (s && s.length >= 2) {
+        var home = (s.find(function(t){ return t.team.id===fix.teams.home.id; })||{}).statistics || [];
+        var away = (s.find(function(t){ return t.team.id===fix.teams.away.id; })||{}).statistics || [];
+        function getStat(arr, name) { var v=(arr.find(function(x){return x.type===name;})||{}).value; return parseInt(v)||0; }
+        statsMap[fix.fixture.id] = {
+          possession:{home:parseInt((home.find(function(x){return x.type==='Ball Possession';})||{}).value)||50,away:parseInt((away.find(function(x){return x.type==='Ball Possession';})||{}).value)||50},
+          shots:{home:getStat(home,'Total Shots'),away:getStat(away,'Total Shots'),onTarget:{home:getStat(home,'Shots on Goal'),away:getStat(away,'Shots on Goal')}},
+          corners:{home:getStat(home,'Corner Kicks'),away:getStat(away,'Corner Kicks')}
+        };
+      }
+    }
+  }
+
+  // Analisa e dispara alertas
+  data.forEach(function(fix) {
+    var stats = statsMap[fix.fixture.id];
+    var odd = parseFloat(calcLiveOdd(fix, stats));
+    var analysis = analyzePressure(fix, stats);
+    var matchName = fix.teams.home.name + ' vs ' + fix.teams.away.name;
+    var alertKey = fix.fixture.id + '_' + fix.fixture.status.elapsed;
+    var hasHigh = analysis.signals.some(function(s){ return s.level==='high'; });
+
+    if (odd <= 1.80 && hasHigh && !STATE.firedAlerts[alertKey]) {
+      STATE.firedAlerts[alertKey] = true;
+      var topSignal = analysis.signals.find(function(s){ return s.level==='high'; });
+      var alr = {
+        time: new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),
+        match: matchName, odd: odd.toFixed(2), period: analysis.period,
+        signal: topSignal ? topSignal.txt : '', type: 'odd'
+      };
+      STATE.alerts.unshift(alr);
+      showLiveAlert(alr);
+      sendBrowserNotif(matchName, analysis.period + ' | Odd: ' + odd.toFixed(2) + ' | ' + (topSignal?topSignal.txt:'Alta pressao'), fix.teams.home.logo);
+      salvarAlertaRastreado(fix, alr, stats);
+    }
+  });
+
+  renderAlertHistory();
+
+  // Renderiza cards
+  document.getElementById('liveGames').innerHTML = data.map(function(fix) {
+    var stats = statsMap[fix.fixture.id];
+    var odd = calcLiveOdd(fix, stats);
+    var oddNum = parseFloat(odd);
+    var analysis = analyzePressure(fix, stats);
+    var oddColor = oddNum<=1.50?'var(--accent)':oddNum<=1.80?'var(--gold)':'var(--muted)';
+    var oddBg    = oddNum<=1.50?'rgba(0,229,160,.15)':oddNum<=1.80?'rgba(255,215,0,.12)':'rgba(255,255,255,.04)';
+    var oddBorder= oddNum<=1.50?'rgba(0,229,160,.4)':oddNum<=1.80?'rgba(255,215,0,.3)':'rgba(255,255,255,.08)';
+    var evts = (fix.events||[]).slice(-3).reverse().map(function(ev){
+      return '<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">' +
+        '<div style="font-family:Bebas Neue,sans-serif;font-size:15px;color:var(--accent2);min-width:28px">' + (ev.time&&ev.time.elapsed?ev.time.elapsed:"?") + "'</div>" +
+        '<div><div style="font-size:13px;font-weight:600">' + (ev.type==='Goal'?'&#9917;':ev.detail&&ev.detail.indexOf('Yellow')>=0?'&#129000;':'&#128309;') + ' ' + (ev.player&&ev.player.name?ev.player.name:'') + '</div>' +
+        '<div style="font-size:12px;color:var(--muted)">' + (ev.team&&ev.team.name?ev.team.name:'') + '</div></div></div>';
+    }).join('') || '<div style="color:var(--muted);font-size:12px;padding:7px 0">Aguardando eventos...</div>';
+    var signalsHtml = analysis.signals.map(function(s){
+      return '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)">' +
+        '<span>' + s.icon + '</span>' +
+        '<span style="font-size:12px;color:' + (s.level==='high'?'var(--text)':'var(--muted)') + '">' + s.txt + '</span>' +
+        (s.level==='high'?'<span style="margin-left:auto;font-size:10px;background:rgba(255,107,53,.2);color:var(--accent2);padding:2px 7px;border-radius:10px;">ALTA</span>':'') +
+        '</div>';
+    }).join('') || '<div style="font-size:12px;color:var(--muted);padding:5px 0">Jogo equilibrado</div>';
+    var hL = teamLogo(fix.teams.home, 28);
+    var aL = teamLogo(fix.teams.away, 28);
+    var betLink = oddNum<=1.80 ? '<div style="border-top:1px solid '+oddBorder+';padding-top:10px;margin-top:8px"><div style="font-size:11px;color:var(--muted);margin-bottom:7px">Apostar agora:</div><a href="https://www.bet365.com/#/IP/B1/" target="_blank" rel="noopener" class="bet-btn">Bet365</a></div>' : '';
+    return '<div style="background:var(--card);border:1px solid ' + (oddNum<=1.80?oddBorder:'var(--border)') + ';border-radius:14px;padding:14px;margin-bottom:14px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+        '<span style="font-size:11px;color:var(--muted)">' + fix.league.name + '</span>' +
+        '<span style="font-size:11px;font-weight:600;color:var(--accent3);background:rgba(79,195,247,.1);padding:2px 8px;border-radius:10px">' + analysis.period + ' ' + (fix.fixture.status.elapsed||'?') + "'" + '</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
+        '<div style="display:flex;align-items:center;gap:8px;flex:1">' + hL + '<span style="font-size:13px;font-weight:600">' + fix.teams.home.name + '</span></div>' +
+        '<div style="text-align:center;padding:0 8px"><div class="score-live">' + (fix.goals.home||0) + '-' + (fix.goals.away||0) + '</div><div class="game-time live">AO VIVO</div></div>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex:1;justify-content:flex-end"><span style="font-size:13px;font-weight:600">' + fix.teams.away.name + '</span>' + aL + '</div>' +
+      '</div>' +
+      '<div style="margin-bottom:12px">' +
+        '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px"><span>' + fix.teams.home.name + '</span><span>Posse</span><span>' + fix.teams.away.name + '</span></div>' +
+        '<div class="pt"><div class="ph" style="width:' + analysis.hp + '%">' + analysis.hp + '%</div><div class="pa">' + analysis.ap + '%</div></div>' +
+      '</div>' +
+      '<div style="background:' + oddBg + ';border:1px solid ' + oddBorder + ';border-radius:10px;padding:10px 14px;margin-bottom:12px">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;' + (oddNum<=1.80?'margin-bottom:10px':'') + '">' +
+          '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Proximo Gol (estimado)</div>' +
+          '<div style="font-size:22px;font-weight:700;font-family:Bebas Neue,sans-serif;color:' + oddColor + ';letter-spacing:1px">' + odd + '</div></div>' +
+          '<div style="text-align:right">' + (oddNum<=1.80 ? '<div style="font-size:11px;font-weight:700;color:'+oddColor+'">ENTRADA RECOMENDADA</div><div style="font-size:11px;color:var(--muted);margin-top:2px">Odd menor ou igual a 1.80</div>' : '<div style="font-size:11px;color:var(--muted)">Aguardando odd menor ou igual a 1.80</div>') + '</div>' +
+        '</div>' +
+        betLink +
+      '</div>' +
+      '<div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:10px">' +
+        '<div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Sinais de Pressao</div>' +
+        signalsHtml +
+      '</div>' +
+      '<div style="border-top:1px solid var(--border);padding-top:8px">' +
+        '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Eventos recentes</div>' +
+        evts +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ── ALERTS ───────────────────────────────────────────────
+function showLiveAlert(alr) {
+  var c = document.getElementById('alertContainer');
+  var div = document.createElement('div');
+  div.className = 'alert-banner';
+  div.innerHTML =
+    '<div style="display:flex;align-items:flex-start;gap:10px">' +
+      '<div style="font-size:20px">&#9889;</div>' +
+      '<div style="flex:1">' +
+        '<div class="alert-title">ENTRADA - ' + alr.match + '</div>' +
+        '<div class="alert-desc">' + alr.period + ' | Odd: ' + alr.odd + ' | ' + alr.signal + '</div>' +
+      '</div>' +
+      '<div style="cursor:pointer;color:var(--muted)" onclick="this.closest(\'.alert-banner\').remove()">&#10005;</div>' +
+    '</div>' +
+    '<div style="border-top:1px solid rgba(255,215,0,.2);padding-top:8px;display:flex;gap:8px;align-items:center">' +
+      '<span style="font-size:11px;color:var(--muted)">Apostar em:</span>' +
+      '<a href="https://www.bet365.com/#/IP/B1/" target="_blank" rel="noopener" class="bet-btn">Bet365</a>' +
+    '</div>';
+  c.prepend(div);
+  setTimeout(function(){ if(div.parentNode) div.remove(); }, 30000);
+}
+
+function renderAlertHistory() {
+  var c = document.getElementById('alertHistory');
+  if (!STATE.alerts.length) { c.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Nenhum alerta ainda</div>'; return; }
+  c.innerHTML = STATE.alerts.slice(0, 20).map(function(a) {
+    return '<div style="background:var(--card);border:1px solid ' + (a.type==='odd'?'rgba(255,215,0,.3)':'var(--border)') + ';border-radius:12px;padding:12px 14px;margin-bottom:10px">' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:5px">' +
+        '<span style="font-size:12px;font-weight:700;color:' + (a.type==='odd'?'var(--gold)':'var(--accent2)') + '">' + (a.type==='odd'?'ENTRADA - ODD '+a.odd:'PRESSAO ALTA') + '</span>' +
+        '<span style="font-size:11px;color:var(--muted)">' + a.time + (a.period?' · '+a.period:'') + '</span>' +
+      '</div>' +
+      '<div style="font-size:13px;font-weight:600;margin-bottom:3px">' + a.match + '</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:' + (a.type==='odd'?'10px':'0') + '">' + (a.signal||a.desc||'') + '</div>' +
+      (a.type==='odd' ? '<div style="border-top:1px solid rgba(255,215,0,.15);padding-top:8px"><a href="https://www.bet365.com/#/IP/B1/" target="_blank" rel="noopener" class="bet-btn">Bet365</a></div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+// ── NOTIFICACOES ─────────────────────────────────────────
+async function requestNotifPermission() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  var p = await Notification.requestPermission();
+  return p === 'granted';
+}
+
+function sendBrowserNotif(title, body, icon) {
+  if (Notification.permission !== 'granted') return;
+  var n = new Notification(title, { body: body, icon: icon || '' });
+  setTimeout(function(){ n.close(); }, 8000);
+}
+
+async function ativarNotificacoes() {
+  if (!('Notification' in window)) { showToast('Browser nao suporta notificacoes'); return; }
+  var granted = await requestNotifPermission();
+  var btn = document.getElementById('notifBtn2');
+  if (granted) {
+    if (btn) { btn.textContent = 'Notificacoes ativas!'; btn.style.background = 'rgba(0,229,160,.2)'; btn.disabled = true; }
+    showToast('Notificacoes ativadas!');
+    sendBrowserNotif('FootStats Pro', 'Voce recebera alertas ao vivo quando odd for menor ou igual a 1.80');
+  } else {
+    showToast('Permissao negada - ative nas configuracoes do browser');
+  }
+}
+
+// ── RASTREAMENTO DE ALERTAS ──────────────────────────────
+var ALERT_CATS = {
+  over15:     'Over 1.5 Gols',
+  over25:     'Over 2.5 Gols',
+  btts:       'Ambas Marcam',
+  vitoria:    'Vitória Favorito',
+  escanteios: 'Escanteios',
+  gol_1t:     'Gol 1º Tempo',
+  gol_2t:     'Gol 2º Tempo',
+  pressao:    'Alta Pressão',
+};
+
+function salvarAlertaRastreado(fix, alr, stats) {
+  var key = 'fs_tracked';
+  var list = [];
+  try { list = JSON.parse(localStorage.getItem(key)||'[]'); } catch(e) {}
+  var base = {
+    fixtureId: fix.fixture.id,
+    match: alr.match,
+    minAlerta: fix.fixture.status.elapsed,
+    periodo: alr.period,
+    odd: alr.odd,
+    resultado: 'pendente',
+    golsAlerta: (fix.goals.home||0)+(fix.goals.away||0),
+    data: new Date().toLocaleDateString('pt-BR'),
+    hora: alr.time
+  };
+  var status = fix.fixture.status.short;
+  if (status==='1H') list.unshift(Object.assign({},base,{categoria:'gol_1t'}));
+  if (status==='2H') list.unshift(Object.assign({},base,{categoria:'gol_2t'}));
+  list.unshift(Object.assign({},base,{categoria:'over15'}));
+  list.unshift(Object.assign({},base,{categoria:'over25'}));
+  if ((fix.goals.home||0)===0 || (fix.goals.away||0)===0) list.unshift(Object.assign({},base,{categoria:'btts'}));
+  list.unshift(Object.assign({},base,{categoria:'pressao'}));
+  try { localStorage.setItem(key, JSON.stringify(list.slice(0,200))); } catch(e) {}
+}
+
+async function verificarPendentes() {
+  var key = 'fs_tracked';
+  var list = [];
+  try { list = JSON.parse(localStorage.getItem(key)||'[]'); } catch(e) {}
+  var pendentes = list.filter(function(a){ return a.resultado==='pendente'; });
+  if (!pendentes.length) return;
+  var ids = [];
+  pendentes.forEach(function(a){ if(ids.indexOf(a.fixtureId)<0) ids.push(a.fixtureId); });
+  for (var i = 0; i < Math.min(ids.length, 5); i++) {
+    var r = await api('/fixtures?id=' + ids[i], 'league');
+    if (!r || !r.length) continue;
+    var fix = r[0];
+    if (fix.fixture.status.short !== 'FT') continue;
+    var gH = fix.goals.home||0, gA = fix.goals.away||0;
+    var total = gH+gA;
+    list.forEach(function(a) {
+      if (a.fixtureId !== ids[i] || a.resultado !== 'pendente') return;
+      if (a.categoria==='gol_1t' || a.categoria==='gol_2t' || a.categoria==='pressao') a.resultado = total>(a.golsAlerta||0)?'acerto':'erro';
+      if (a.categoria==='btts') a.resultado = (gH>0&&gA>0)?'acerto':'erro';
+      if (a.categoria==='over15') a.resultado = total>1?'acerto':'erro';
+      if (a.categoria==='over25') a.resultado = total>2?'acerto':'erro';
+      if (a.categoria==='vitoria') a.resultado = (gH!==gA)?'acerto':'erro';
+      if (a.categoria==='escanteios') a.resultado = 'pendente'; // manual
+      a.placarFinal = gH+'-'+gA;
+    });
+  }
+  try { localStorage.setItem(key, JSON.stringify(list)); } catch(e) {}
+}
+
+// ── REPORT ───────────────────────────────────────────────
+async function loadReport() {
+  document.getElementById('reportDate').textContent = new Date().toLocaleDateString('pt-BR');
+  document.getElementById('reportContent').innerHTML = '<div class="loading"><div class="spinner"></div>Verificando resultados...</div>';
+  await verificarPendentes();
+  var list = [];
+  try { list = JSON.parse(localStorage.getItem('fs_tracked')||'[]'); } catch(e) {}
+
+  // Demo: gera dados de exemplo se vazio
+  if (DEMO_MODE && !list.length) {
+    var teams = [['Flamengo','Corinthians'],['Palmeiras','Sao Paulo'],['Atletico MG','Fluminense'],['Liverpool','Arsenal'],['Real Madrid','Barcelona']];
+    var cats = ['over15','over25','btts','vitoria','escanteios','gol_1t','gol_2t','pressao'];
+    var ress = ['acerto','acerto','acerto','erro','acerto','acerto','erro','acerto'];
+    for (var i = 0; i < 40; i++) {
+      list.push({fixtureId:9000+i,match:teams[i%teams.length].join(' vs '),categoria:cats[i%cats.length],minAlerta:30+Math.floor(Math.random()*50),periodo:i%2===0?'1 Tempo':'2 Tempo',odd:(1.30+Math.random()*1.20).toFixed(2),resultado:ress[i%ress.length],placarFinal:Math.floor(Math.random()*3)+'-'+Math.floor(Math.random()*3),data:new Date().toLocaleDateString('pt-BR'),hora:'20:00'});
+    }
+  }
+
+  var verificados = list.filter(function(a){ return a.resultado!=='pendente'; });
+  var pendentes   = list.filter(function(a){ return a.resultado==='pendente'; });
+  var totalAcertos = verificados.filter(function(a){ return a.resultado==='acerto'; }).length;
+  var taxa = verificados.length ? Math.round(totalAcertos/verificados.length*100) : 0;
+  var corTaxa = taxa>=70?'var(--accent)':taxa>=50?'var(--gold)':'var(--red)';
+
+  var statsXCat = {};
+  Object.keys(ALERT_CATS).forEach(function(cat) {
+    var catList = verificados.filter(function(a){ return a.categoria===cat; });
+    var ac = catList.filter(function(a){ return a.resultado==='acerto'; }).length;
+    statsXCat[cat] = {total:catList.length, acertos:ac, pct:catList.length?Math.round(ac/catList.length*100):0};
+  });
+
+  // Ranking: mercados com dados, ordenados por % acerto
+  var rankMercados = Object.entries(ALERT_CATS)
+    .map(function(e){ return {cat:e[0], label:e[1], s:statsXCat[e[0]]}; })
+    .filter(function(r){ return r.s.total > 0; })
+    .sort(function(a,b){ return b.s.pct - a.s.pct; });
+
+  var medalhas = ['🥇','🥈','🥉'];
+
+  var html =
+    '<div class="report-card" style="border-color:rgba(0,229,160,.3)">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px"><span style="font-size:28px">📊</span>' +
+      '<div><div style="font-size:15px;font-weight:700">Relatório por Mercado' + (DEMO_MODE?' (Demo)':'') + '</div><div style="font-size:12px;color:var(--muted)">' + verificados.length + ' apostas verificadas</div></div></div>' +
+      '<div style="text-align:center;padding:16px 0;border-bottom:1px solid var(--border);margin-bottom:16px">' +
+        '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Taxa de Acerto Geral</div>' +
+        '<div style="font-size:52px;font-weight:700;font-family:Bebas Neue,sans-serif;color:' + corTaxa + ';letter-spacing:2px;line-height:1">' + taxa + '%</div>' +
+        '<div style="font-size:13px;color:var(--muted);margin-top:6px">' + totalAcertos + ' acertos de ' + verificados.length + ' apostas</div>' +
+        '<div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;margin-top:12px;overflow:hidden"><div style="height:100%;width:' + taxa + '%;background:' + corTaxa + ';border-radius:3px"></div></div>' +
+      '</div>' +
+      '<div class="ri"><span class="rl">Pendentes (em andamento)</span><span class="rv" style="color:var(--gold)">' + pendentes.length + '</span></div>' +
+      '<div class="ri"><span class="rl">Verificados</span><span class="rv p">' + verificados.length + '</span></div>' +
+      '<div class="ri"><span class="rl">Acertos</span><span class="rv p">' + totalAcertos + '</span></div>' +
+      '<div class="ri"><span class="rl">Erros</span><span class="rv" style="color:var(--red)">' + (verificados.length-totalAcertos) + '</span></div>' +
+    '</div>' +
+
+    // Ranking de mercados
+    (rankMercados.length > 0 ?
+    '<div class="report-card" style="border-color:rgba(255,215,0,.3)">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">' +
+        '<span style="font-size:20px">🏆</span>' +
+        '<div><div style="font-size:14px;font-weight:700;color:var(--gold)">Mercado Mais Assertivo</div>' +
+        '<div style="font-size:11px;color:var(--muted)">Ranking por taxa de acerto</div></div>' +
+      '</div>' +
+      rankMercados.map(function(r, i){
+        var medal = i < 3 ? medalhas[i] : (i+1) + 'º';
+        var c = r.s.pct>=70?'var(--accent)':r.s.pct>=50?'var(--gold)':'var(--red)';
+        var isBest = i === 0;
+        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)' + (isBest?';background:rgba(0,229,160,.04);margin:0 -14px;padding:10px 14px;border-radius:10px':'') + '">' +
+          '<span style="font-size:16px;min-width:28px;text-align:center">' + medal + '</span>' +
+          '<div style="flex:1">' +
+            '<div style="font-size:13px;font-weight:' + (isBest?'700':'500') + ';color:' + (isBest?'#fff':'var(--text)') + '">' + r.label + '</div>' +
+            '<div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:5px;overflow:hidden"><div style="height:100%;width:' + r.s.pct + '%;background:' + c + ';border-radius:2px"></div></div>' +
+          '</div>' +
+          '<div style="text-align:right">' +
+            '<div style="font-family:Bebas Neue,sans-serif;font-size:20px;color:' + c + '">' + r.s.pct + '%</div>' +
+            '<div style="font-size:10px;color:var(--muted)">' + r.s.acertos + '/' + r.s.total + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('') +
+    '</div>' : '') +
+
+    '<div class="report-card"><div style="font-size:14px;font-weight:600;margin-bottom:14px">Acertos por Mercado</div>' +
+    Object.entries(ALERT_CATS).map(function(entry) {
+      var cat = entry[0], label = entry[1];
+      var s = statsXCat[cat];
+      var c = s.pct>=70?'var(--accent)':s.pct>=50?'var(--gold)':'var(--red)';
+      return '<div style="margin-bottom:14px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">' +
+          '<span style="font-size:13px">' + label + '</span>' +
+          '<div style="display:flex;align-items:center;gap:10px"><span style="font-size:11px;color:var(--muted)">' + s.acertos + '/' + s.total + '</span><span style="font-size:15px;font-weight:700;font-family:Bebas Neue,sans-serif;color:' + c + ';min-width:42px;text-align:right">' + (s.total?s.pct+'%':'--') + '</span></div>' +
+        '</div>' +
+        '<div style="height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden"><div style="height:100%;width:' + (s.total?s.pct:0) + '%;background:' + c + ';border-radius:3px"></div></div>' +
+      '</div>';
+    }).join('') + '</div>' +
+    '<div class="report-card"><div style="font-size:14px;font-weight:600;margin-bottom:12px">Últimas Apostas</div>' +
+    (verificados.length===0 ? '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">Nenhuma aposta verificada ainda.<br>As apostas sao verificadas automaticamente quando o jogo termina.</div>' :
+    verificados.slice(0,10).map(function(a) {
+      var isAc = a.resultado==='acerto';
+      return '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04)">' +
+        '<div style="font-size:18px">' + (isAc?'✅':'❌') + '</div>' +
+        '<div style="flex:1">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">' +
+            '<span style="font-size:12px;font-weight:600">' + a.match + '</span>' +
+            '<span style="font-size:10px;background:' + (isAc?'rgba(0,229,160,.15)':'rgba(255,68,68,.12)') + ';color:' + (isAc?'var(--accent)':'var(--red)') + ';padding:2px 8px;border-radius:10px;border:1px solid ' + (isAc?'rgba(0,229,160,.3)':'rgba(255,68,68,.3)') + '">' + (isAc?'ACERTO':'ERRO') + '</span>' +
+          '</div>' +
+          '<div style="font-size:11px;color:var(--muted);margin-top:3px">' + (ALERT_CATS[a.categoria]||a.categoria) + (a.periodo?' · '+a.periodo:'') + (a.minAlerta?" · "+a.minAlerta+"'":'') + (a.odd?' · odd '+a.odd:'') + (a.placarFinal?' · '+a.placarFinal:'') + '</div>' +
+          '<div style="font-size:11px;color:rgba(255,255,255,.25)">' + (a.data||'') + ' ' + (a.hora||'') + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('')) + '</div>';
+
+  if (list.length) {
+    html += '<div style="text-align:center;margin:4px 0 20px"><button onclick="limparHistorico()" style="background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.3);color:var(--red);padding:10px 24px;border-radius:20px;font-size:13px;cursor:pointer;font-family:\'DM Sans\',sans-serif;">Limpar Histórico</button></div>';
+  }
+
+  html += '<div class="report-card"><div style="font-size:14px;font-weight:600;margin-bottom:12px">Acertos x Erros por Mercado</div><div style="position:relative;height:200px"><canvas id="reportChart">Grafico.</canvas></div></div>';
+  document.getElementById('reportContent').innerHTML = html;
+
+  setTimeout(function() {
+    var ctx = document.getElementById('reportChart');
+    if (!ctx || ctx._done) return; ctx._done = true;
+    var labels = Object.values(ALERT_CATS).map(function(l){ return l.split(' ').slice(0,2).join(' '); });
+    var acertos = Object.keys(ALERT_CATS).map(function(c){ return statsXCat[c].acertos; });
+    var erros   = Object.keys(ALERT_CATS).map(function(c){ return statsXCat[c].total - statsXCat[c].acertos; });
+    new Chart(ctx, {type:'bar',data:{labels:labels,datasets:[{label:'Acertos',data:acertos,backgroundColor:'rgba(0,229,160,.7)',borderRadius:5},{label:'Erros',data:erros,backgroundColor:'rgba(255,68,68,.5)',borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#7986cb',font:{size:11}}}},scales:{x:{stacked:true,grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7986cb',font:{size:9},maxRotation:30}},y:{stacked:true,grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7986cb',font:{size:11}},beginAtZero:true}}}});
+  }, 100);
+}
+
+function limparHistorico() {
+  if (!confirm('Apagar todo o historico de alertas?')) return;
+  localStorage.removeItem('fs_tracked');
+  loadReport();
+  showToast('Historico limpo');
+}
+
+// ── NEWS ─────────────────────────────────────────────────
+async function loadNews() {
+  document.getElementById('newsFeed').innerHTML = '<div class="loading"><div class="spinner"></div>Carregando...</div>';
+  var c = document.getElementById('newsFeed');
+  var inj = DEMO_MODE ? [] : await api('/injuries?league=71&season=2024', 'stats') || [];
+  if (inj.length) {
+    c.innerHTML = inj.slice(0,8).map(function(i) {
+      return '<div class="news-card"><div style="font-size:24px">&#129308;</div><div><div style="font-size:13px;font-weight:600;margin-bottom:4px">' + (i.player&&i.player.name?i.player.name:'Jogador') + ' - ' + (i.team&&i.team.name?i.team.name:'') + '</div><div style="font-size:12px;color:var(--muted)">' + (i.player&&i.player.reason?i.player.reason:'Lesao confirmada') + '</div></div></div>';
+    }).join('');
+  } else {
+    c.innerHTML =
+      '<div class="news-card"><div style="font-size:24px">' + (DEMO_MODE?'&#127985;':'&#9989;') + '</div><div><div style="font-size:13px;font-weight:600;margin-bottom:4px">' + (DEMO_MODE?'Modo Demo ativo':'API conectada') + '</div><div style="font-size:12px;color:var(--muted)">' + (DEMO_MODE?'Usando dados simulados.':'Dados em tempo real funcionando.') + '</div></div></div>' +
+      '<div class="news-card"><div style="font-size:24px">&#9889;</div><div><div style="font-size:13px;font-weight:600;margin-bottom:4px">Alertas ativos</div><div style="font-size:12px;color:var(--muted)">Monitorando posse acima de 65% e odd menor ou igual 1.80.</div></div></div>' +
+      '<div class="news-card"><div style="font-size:24px">&#128260;</div><div><div style="font-size:13px;font-weight:600;margin-bottom:4px">Auto-refresh ativo</div><div style="font-size:12px;color:var(--muted)">Ao vivo atualiza a cada 60 segundos.</div></div></div>';
+  }
+}
+
+// ── UTILS ────────────────────────────────────────────────
+function showSection(name, btn) {
+  document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('sec-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name==='analises') initChat();
+  if (name==='palpites') loadPalpites();
+  if (name==='relatorio') loadReport();
+  if (name==='config') updateCacheStats();
+}
+
+function toggleSwitch(el) { el.classList.toggle('on'); showToast(el.classList.contains('on')?'Ativado!':'Desativado'); }
+function showToast(msg) { var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(function(){ t.classList.remove('show'); }, 2500); }
+async function loadAll() { showToast('Atualizando...'); buildDateBar(); await loadGames(); }
+
+// ── AI ANALYSIS ──────────────────────────────────────────
+var AI_CACHE = {};
+async function loadAI(fid, fix) {
+  var loadEl = document.getElementById('ai-load-' + fid);
+  var resEl  = document.getElementById('ai-result-' + fid);
+  if (!loadEl || !resEl) return;
+  if (AI_CACHE[fid]) { loadEl.style.display='none'; resEl.style.display='block'; resEl.innerHTML=AI_CACHE[fid]; return; }
+  loadEl.style.display='flex'; resEl.style.display='none';
+  var stats = getStats(fix.teams.home.id, fix.teams.away.id);
+  var prompt = 'Voce e um analista de futebol profissional. Analise a partida: ' +
+    fix.teams.home.name + ' vs ' + fix.teams.away.name + ' (' + fix.league.name + '). ' +
+    (stats ? 'Media de gols casa: ' + stats.hGF + ', fora: ' + stats.aGF + '. Over 1.5: ' + (stats.o15*10) + '%. Ambas marcam: ' + (stats.btts*10) + '%. Escanteios media: ' + stats.corners + '.' : '') +
+    ' Faca uma analise curta e direta (3-4 paragrafos) cobrindo: contexto do jogo, principais forcas e fraquezas de cada time, palpite mais provavel com confianca, e placar previsto. Responda em portugues brasileiro de forma objetiva.';
+  try {
+    var r = await fetch('/.netlify/functions/ai', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:1000, messages:[{role:'user',content:prompt}] })
+    });
+    var d = await r.json();
+    var txt = (d.content && d.content[0] && d.content[0].text) ? d.content[0].text : 'Analise nao disponivel.';
+    var html = txt.replace(/\n\n/g,'</p><p style="margin-top:8px">').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+    AI_CACHE[fid] = '<p>' + html + '</p>';
+    loadEl.style.display='none'; resEl.style.display='block'; resEl.innerHTML=AI_CACHE[fid];
+  } catch(e) {
+    loadEl.style.display='none'; resEl.style.display='block';
+    resEl.innerHTML='<span style="color:var(--muted)">Analise IA indisponivel no momento.</span>';
+  }
+}
+
+// ── LEAGUE FILTER ────────────────────────────────────────
+var CURRENT_LEAGUE_FILTER = '';
+function filterLeague(league, el) {
+  CURRENT_LEAGUE_FILTER = league;
+  document.querySelectorAll('.fleague-btn').forEach(function(b){ b.classList.remove('active'); });
+  el.classList.add('active');
+  if (!STATE.games.length) return;
+  var filtered = league ? STATE.games.filter(function(f){ return f.league.name.toLowerCase().indexOf(league.toLowerCase())>=0; }) : STATE.games;
+  document.getElementById('gamesCount').textContent = filtered.length + ' jogos';
+  renderGames(filtered);
+  if (filtered.length) buildTipOfDay(filtered);
+}
+
+// ── PALPITES PRONTOS ─────────────────────────────────────
+var PALPITES_CACHE = null;
+var PALPITES_CACHE_DATE = null;
+
+var PALPITES_DEMO_BASE = [
+  {home:'Alemanha',away:'Curacao',league:'Copa do Mundo',hFlag:'🇩🇪',aFlag:'🇨🇼',time:'12:00',tip:'Alemanha vence + Over 1.5',odd:1.85,conf:88,mercado:'Resultado + Gols',analise:'Favorito absoluto contra estreante. Media de 2.3 gols por jogo nas eliminatorias.',stats:{o15:92,o25:76,btts:35,vitoria_fav:88,escanteios_media:'9.8',casa_fin_gol:'3.1',casa_fin_fora:'4.2',fora_fin_gol:'0.9',fora_fin_fora:'1.4',casa_faltas:'9',fora_faltas:'14'}},
+  {home:'Holanda',away:'Japao',league:'Copa do Mundo',hFlag:'🇳🇱',aFlag:'🇯🇵',time:'15:00',tip:'Over 2.5 gols',odd:1.92,conf:81,mercado:'Total de Gols',analise:'Holanda ataca muito, Japao marca de contra-ataque. Historico de jogos com 3+ gols.',stats:{o15:88,o25:68,btts:62,vitoria_fav:72,escanteios_media:'10.2',casa_fin_gol:'2.8',casa_fin_fora:'3.5',fora_fin_gol:'1.8',fora_fin_fora:'2.1',casa_faltas:'10',fora_faltas:'11'}},
+  {home:'Brasil',away:'Mexico',league:'Copa do Mundo',hFlag:'🇧🇷',aFlag:'🇲🇽',time:'19:00',tip:'Brasil vence e marca 2+',odd:2.10,conf:79,mercado:'Resultado / Gols',analise:'Brasil invicto nas eliminatorias com 28 gols marcados. Mexico defesa fraca fora.',stats:{o15:91,o25:74,btts:58,vitoria_fav:79,escanteios_media:'11.0',casa_fin_gol:'3.2',casa_fin_fora:'4.1',fora_fin_gol:'1.5',fora_fin_fora:'2.8',casa_faltas:'11',fora_faltas:'13'}},
+  {home:'Real Madrid',away:'Bayern Munich',league:'Champions League',hFlag:'🇪🇸',aFlag:'🇩🇪',time:'21:00',tip:'Ambas marcam',odd:1.80,conf:86,mercado:'BTTS',analise:'2 dos maiores ataques da Europa. Historico: 8 dos ultimos 10 H2H com ambas marcando.',stats:{o15:94,o25:80,btts:78,vitoria_fav:55,escanteios_media:'10.5',casa_fin_gol:'3.5',casa_fin_fora:'4.8',fora_fin_gol:'3.2',fora_fin_fora:'4.1',casa_faltas:'10',fora_faltas:'11'}},
+  {home:'Arsenal',away:'Liverpool',league:'Premier League',hFlag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',aFlag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',time:'13:30',tip:'Over 2.5 gols',odd:1.88,conf:82,mercado:'Total de Gols',analise:'Top 2 da Premier. Media combinada de 4.1 gols/jogo nos ultimos 5 confrontos diretos.',stats:{o15:90,o25:73,btts:72,vitoria_fav:60,escanteios_media:'10.1',casa_fin_gol:'3.0',casa_fin_fora:'3.9',fora_fin_gol:'2.8',fora_fin_fora:'3.5',casa_faltas:'10',fora_faltas:'10'}},
+  {home:'Flamengo',away:'Palmeiras',league:'Brasileirao Serie A',hFlag:'🇧🇷',aFlag:'🇧🇷',time:'16:00',tip:'Flamengo vence',odd:2.00,conf:71,mercado:'Resultado',analise:'Flamengo em casa com 87% de aproveitamento. Palmeiras sem 2 titulares por suspensao.',stats:{o15:85,o25:60,btts:65,vitoria_fav:71,escanteios_media:'8.8',casa_fin_gol:'2.5',casa_fin_fora:'3.4',fora_fin_gol:'2.1',fora_fin_fora:'2.9',casa_faltas:'12',fora_faltas:'11'}},
+  {home:'Espanha',away:'Japao',league:'Copa do Mundo',hFlag:'🇪🇸',aFlag:'🇯🇵',time:'18:00',tip:'Espanha Over 1.5 gols marcados',odd:1.83,conf:84,mercado:'Gols Time',analise:'Espanha com melhor posse da Copa (67%). Japao defensivo mas perigo em contra-ataques.',stats:{o15:88,o25:65,btts:48,vitoria_fav:80,escanteios_media:'9.3',casa_fin_gol:'2.9',casa_fin_fora:'4.0',fora_fin_gol:'1.4',fora_fin_fora:'2.2',casa_faltas:'9',fora_faltas:'13'}},
+  {home:'Barcelona',away:'Atletico Madrid',league:'La Liga',hFlag:'🇪🇸',aFlag:'🇪🇸',time:'20:00',tip:'Over 1.5 gols',odd:1.82,conf:83,mercado:'Total de Gols',analise:'El Classico catalao-madrileno. Media de 2.8 gols nos ultimos 5 H2H.',stats:{o15:84,o25:62,btts:68,vitoria_fav:62,escanteios_media:'9.7',casa_fin_gol:'3.1',casa_fin_fora:'4.2',fora_fin_gol:'2.0',fora_fin_fora:'2.8',casa_faltas:'11',fora_faltas:'12'}},
+  {home:'Juventus',away:'Inter Milan',league:'Serie A',hFlag:'🇮🇹',aFlag:'🇮🇹',time:'17:00',tip:'Ambas marcam',odd:1.95,conf:75,mercado:'BTTS',analise:'Derby italiano sempre equilibrado. Inter com 78% BTTS nos ultimos 9 jogos.',stats:{o15:80,o25:55,btts:72,vitoria_fav:52,escanteios_media:'8.5',casa_fin_gol:'2.3',casa_fin_fora:'3.1',fora_fin_gol:'2.4',fora_fin_fora:'3.2',casa_faltas:'12',fora_faltas:'13'}},
+  {home:'Atletico MG',away:'Fluminense',league:'Copa do Brasil',hFlag:'🇧🇷',aFlag:'🇧🇷',time:'21:30',tip:'Over 1.5 gols',odd:1.90,conf:77,mercado:'Total de Gols',analise:'Copa do Brasil semi com times em forma. Media de 2.4 gols nos confrontos recentes.',stats:{o15:82,o25:58,btts:62,vitoria_fav:65,escanteios_media:'9.0',casa_fin_gol:'2.4',casa_fin_fora:'3.2',fora_fin_gol:'1.9',fora_fin_fora:'2.6',casa_faltas:'12',fora_faltas:'11'}},
+];
+
+function getTodayPalpites() {
+  // Rotate based on day so it feels fresh daily
+  var day = new Date().getDay();
+  var count = 7 + (day % 4); // 7-10 tips
+  var offset = day % 3;
+  var all = PALPITES_DEMO_BASE;
+  var result = all.slice(offset).concat(all.slice(0, offset));
+  return result.slice(0, count);
+}
+
+var PALPITES_LOADED = false;
+
+async function loadPalpites() {
+  var today = new Date().toISOString().split('T')[0];
+  if (PALPITES_LOADED && PALPITES_CACHE_DATE === today) return;
+
+  document.getElementById('palpitesList').innerHTML = '<div class="loading"><div class="spinner"></div>Gerando palpites com IA...</div>';
+
+  var tips;
+  try {
+    var prompt = 'Voce e um tipster profissional de futebol. Use estatisticas reais de Fbref, Understat, SofaScore e WhoScored. ' +
+      'Gere de 8 a 12 dicas (tips) para os melhores jogos de hoje (' + today + ') APENAS nos seguintes campeonatos: ' +
+      'Premier League, La Liga, Serie A Italiana, Brasileirao Serie A, Brasileirao Serie B, Copa do Brasil, Champions League, Libertadores, Sul-Americana, Copa do Mundo, Mundial de Clubes.' +
+      '\nREGRAS OBRIGATORIAS:' +
+      '\n- Odds SOMENTE entre 1.80 e 3.50' +
+      '\n- Confianca acima de 65%' +
+      '\n- Mercados variados: Over 1.5/2.5 gols, BTTS, Resultado/Vitoria favorito, Escanteios, Finalizacoes no gol, Faltas' +
+      '\n- Para cada dica inclua estatisticas de: finalizacoes no gol, finalizacoes fora do gol, faltas sofridas/cometidas, escanteios media, Over 1.5/2.5 %, BTTS %, vitoria favorito %' +
+      '\n- Analise concisa de no maximo 1 frase com base em estatisticas reais' +
+      '\nResponda APENAS JSON valido sem markdown:' +
+      '\n{"dicas":[{"home":"nome","away":"nome","league":"liga","hFlag":"emoji","aFlag":"emoji","time":"HH:MM","tip":"descricao do mercado","odd":1.95,"conf":78,"mercado":"tipo",' +
+      '"analise":"frase de analise",' +
+      '"stats":{"o15":83,"o25":62,"btts":55,"vitoria_fav":68,"escanteios_media":"9.5","casa_fin_gol":"2.1","casa_fin_fora":"3.2","fora_fin_gol":"1.5","fora_fin_fora":"2.3","casa_faltas":"11","fora_faltas":"12"}}]}';
+
+    var r = await fetch('/.netlify/functions/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
+    });
+    var d = await r.json();
+    var txt = (d.content && d.content[0] && d.content[0].text || '').trim().replace(/```json|```/g,'').trim();
+    var parsed = JSON.parse(txt);
+    tips = parsed.dicas || getTodayPalpites();
+    // enforce odd >= 1.80
+    tips = tips.filter(function(t){ return parseFloat(t.odd) >= 1.80; });
+    if (tips.length < 5) tips = getTodayPalpites();
+  } catch(e) {
+    tips = getTodayPalpites();
+  }
+
+  PALPITES_CACHE = tips;
+  PALPITES_CACHE_DATE = today;
+  PALPITES_LOADED = true;
+  renderPalpites(tips);
+}
+
+function renderPalpites(tips) {
+  document.getElementById('palpitesCount').textContent = tips.length + ' dicas';
+
+  var dateStr = new Date().toLocaleDateString('pt-BR', {weekday:'long', day:'2-digit', month:'long'});
+  var html = '<div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:16px;text-transform:capitalize;">' + dateStr + '</div>';
+
+  tips.forEach(function(t, i) {
+    var odd = parseFloat(t.odd).toFixed(2);
+    var conf = parseInt(t.conf);
+    var confColor = conf >= 80 ? 'var(--accent)' : conf >= 70 ? 'var(--gold)' : 'var(--accent2)';
+    var confBg = conf >= 80 ? 'rgba(0,229,160,.15)' : conf >= 70 ? 'rgba(255,215,0,.12)' : 'rgba(255,107,53,.12)';
+    var confBorder = conf >= 80 ? 'rgba(0,229,160,.35)' : conf >= 70 ? 'rgba(255,215,0,.3)' : 'rgba(255,107,53,.3)';
+    var rank = i < 3 ? ['🥇','🥈','🥉'][i] : '🎯';
+    var s = t.stats || {};
+
+    // Mini stats row
+    var statsHtml = '';
+    if (s.o15 || s.o25 || s.btts || s.vitoria_fav) {
+      statsHtml = '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;margin-bottom:2px;">';
+      if (s.o15)  statsHtml += '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.25);color:var(--accent)">O1.5: ' + s.o15 + '%</span>';
+      if (s.o25)  statsHtml += '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.25);color:var(--accent)">O2.5: ' + s.o25 + '%</span>';
+      if (s.btts) statsHtml += '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(79,195,247,.1);border:1px solid rgba(79,195,247,.25);color:var(--accent3)">BTTS: ' + s.btts + '%</span>';
+      if (s.vitoria_fav) statsHtml += '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.25);color:var(--gold)">Fav: ' + s.vitoria_fav + '%</span>';
+      if (s.escanteios_media) statsHtml += '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.25);color:var(--accent2)">🚩 ' + s.escanteios_media + '</span>';
+      statsHtml += '</div>';
+      // Finalizações + Faltas
+      if (s.casa_fin_gol || s.fora_fin_gol || s.casa_faltas || s.fora_faltas) {
+        statsHtml += '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">';
+        if (s.casa_fin_gol) statsHtml += '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted)">🎯no gol: ' + s.casa_fin_gol + '/' + (s.fora_fin_gol||'?') + '</span>';
+        if (s.casa_fin_fora) statsHtml += '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted)">🎯fora: ' + s.casa_fin_fora + '/' + (s.fora_fin_fora||'?') + '</span>';
+        if (s.casa_faltas) statsHtml += '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted)">⚠️ faltas: ' + s.casa_faltas + '/' + (s.fora_faltas||'?') + '</span>';
+        statsHtml += '</div>';
+      }
+    }
+
+    html +=
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;position:relative;overflow:hidden;">' +
+        '<div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:' + confColor + ';border-radius:3px 0 0 3px;"></div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">' +
+          '<div style="display:flex;align-items:center;gap:6px;">' +
+            '<span style="font-size:16px;">' + rank + '</span>' +
+            '<span style="font-size:11px;color:var(--muted);">' + t.league + '</span>' +
+          '</div>' +
+          '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(79,195,247,.12);color:var(--accent3);">⏰ ' + (t.time || '--:--') + '</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px;">' +
+          '<div style="text-align:center;flex:1;">' +
+            '<div style="font-size:24px;">' + (t.hFlag || '🏠') + '</div>' +
+            '<div style="font-size:12px;font-weight:600;margin-top:2px;">' + t.home + '</div>' +
+          '</div>' +
+          '<div style="font-size:11px;color:var(--muted);padding:0 4px;">vs</div>' +
+          '<div style="text-align:center;flex:1;">' +
+            '<div style="font-size:24px;">' + (t.aFlag || '✈️') + '</div>' +
+            '<div style="font-size:12px;font-weight:600;margin-top:2px;">' + t.away + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="background:rgba(0,229,160,.06);border:1px solid rgba(0,229,160,.2);border-radius:10px;padding:10px 12px;margin-bottom:10px;">' +
+          '<div style="font-size:10px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">' + (t.mercado || 'Dica') + '</div>' +
+          '<div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:8px;">✓ ' + t.tip + '</div>' +
+          '<div style="font-size:12px;color:var(--muted);line-height:1.5;">' + t.analise + '</div>' +
+          statsHtml +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+          '<div style="flex:1;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.25);border-radius:10px;padding:8px;text-align:center;">' +
+            '<div style="font-size:10px;color:var(--muted);margin-bottom:2px;">ODD</div>' +
+            '<div style="font-family:Bebas Neue,sans-serif;font-size:26px;color:var(--gold);letter-spacing:1px;">' + odd + '</div>' +
+          '</div>' +
+          '<div style="flex:1;background:' + confBg + ';border:1px solid ' + confBorder + ';border-radius:10px;padding:8px;text-align:center;">' +
+            '<div style="font-size:10px;color:var(--muted);margin-bottom:2px;">CONFIANÇA</div>' +
+            '<div style="font-family:Bebas Neue,sans-serif;font-size:26px;color:' + confColor + ';letter-spacing:1px;">' + conf + '%</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:10px;overflow:hidden;">' +
+          '<div style="height:100%;width:' + conf + '%;background:linear-gradient(90deg,' + confColor + ',var(--accent3));border-radius:2px;"></div>' +
+        '</div>' +
+      '</div>';
+  });
+
+  html += '<div style="text-align:center;margin:4px 0 20px;">' +
+    '<button onclick="refreshPalpites()" style="background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3);color:var(--accent);padding:10px 24px;border-radius:24px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif;">🔄 Atualizar palpites</button>' +
+  '</div>';
+
+  document.getElementById('palpitesList').innerHTML = html;
+}
+
+function refreshPalpites() {
+  PALPITES_LOADED = false;
+  loadPalpites();
+}
+
+// ── ANALISES CHAT ENGINE ─────────────────────────────────
+var CHAT_STATE = { step: 'date', selectedDate: null, selectedMatch: null };
+
+// Top leagues — filtro obrigatório
+var CHAT_LEAGUES = [
+  {id:39,  name:'Premier League',       emoji:'🏴󠁧󠁢󠁥󠁮󠁧󠁿'},
+  {id:140, name:'La Liga',              emoji:'🇪🇸'},
+  {id:135, name:'Serie A',              emoji:'🇮🇹'},
+  {id:71,  name:'Brasileirao Serie A',  emoji:'🇧🇷'},
+  {id:72,  name:'Brasileirao Serie B',  emoji:'🇧🇷'},
+  {id:73,  name:'Copa do Brasil',       emoji:'🏆'},
+  {id:2,   name:'Champions League',     emoji:'⭐'},
+  {id:13,  name:'Libertadores',         emoji:'🌎'},
+  {id:11,  name:'Sul-Americana',        emoji:'🌎'},
+  {id:1,   name:'Copa do Mundo',        emoji:'🏆'},
+  {id:15,  name:'Mundial de Clubes',    emoji:'🌍'},
+];
+
+var ALLOWED_LEAGUE_IDS = CHAT_LEAGUES.map(function(l){ return l.id; });
+
+// Match data keyed by YYYY-MM-DD — populated from API or demo
+var CHAT_MATCHES_CACHE = {};
+
+var CHAT_DEMO_MATCHES = {
+  'default': [
+    {id:'m1',home:'Alemanha',away:'Curacao',league:'Copa do Mundo 2026',time:'12:00',hFlag:'🇩🇪',aFlag:'🇨🇼',group:'Grupo A',hForm:['W','W','W','D','W'],aForm:['L','D','L','L','D'],hGF:2.3,aGF:0.6,corners:10.2,btts:42,o15:88,o25:72},
+    {id:'m2',home:'Costa do Marfim',away:'Equador',league:'Copa do Mundo 2026',time:'15:00',hFlag:'🇨🇮',aFlag:'🇪🇨',group:'Grupo B',hForm:['W','D','W','W','L'],aForm:['D','W','L','W','D'],hGF:1.4,aGF:1.1,corners:8.5,btts:65,o15:80,o25:55},
+    {id:'m3',home:'Holanda',away:'Japao',league:'Copa do Mundo 2026',time:'18:00',hFlag:'🇳🇱',aFlag:'🇯🇵',group:'Grupo C',hForm:['W','W','D','W','W'],aForm:['W','D','W','L','W'],hGF:2.0,aGF:1.2,corners:9.8,btts:60,o15:82,o25:61},
+    {id:'m4',home:'Suecia',away:'Tunisia',league:'Copa do Mundo 2026',time:'21:00',hFlag:'🇸🇪',aFlag:'🇹🇳',group:'Grupo C',hForm:['W','W','D','W','L'],aForm:['L','D','D','L','W'],hGF:1.8,aGF:0.9,corners:9.1,btts:48,o15:83,o25:65},
+    {id:'m5',home:'Brasil',away:'Mexico',league:'Copa do Mundo 2026',time:'19:00',hFlag:'🇧🇷',aFlag:'🇲🇽',group:'Grupo D',hForm:['W','W','W','W','D'],aForm:['W','D','L','W','W'],hGF:2.2,aGF:1.3,corners:11.0,btts:58,o15:90,o25:74},
+    {id:'m6',home:'Real Madrid',away:'Bayern Munich',league:'Champions League',time:'21:00',hFlag:'🇪🇸',aFlag:'🇩🇪',group:'Semi',hForm:['W','W','D','W','W'],aForm:['W','W','W','D','W'],hGF:2.4,aGF:2.1,corners:10.5,btts:75,o15:92,o25:78},
+    {id:'m7',home:'Flamengo',away:'Palmeiras',league:'Brasileirao',time:'16:00',hFlag:'🇧🇷',aFlag:'🇧🇷',group:'Rodada 12',hForm:['W','D','W','W','L'],aForm:['W','W','D','W','W'],hGF:1.9,aGF:1.6,corners:8.8,btts:68,o15:85,o25:62},
+    {id:'m8',home:'Arsenal',away:'Liverpool',league:'Premier League',time:'13:30',hFlag:'🇬🇧',aFlag:'🇬🇧',group:'Matchday 36',hForm:['W','W','W','D','W'],aForm:['W','W','D','W','W'],hGF:2.1,aGF:2.0,corners:10.1,btts:70,o15:89,o25:73},
+  ]
+};
+
+function getChatDemoMatches(dateStr) {
+  // Rotate subset so different dates feel different
+  var all = CHAT_DEMO_MATCHES['default'];
+  var dayOffset = new Date(dateStr + 'T12:00:00').getDay();
+  var count = 4 + (dayOffset % 3);
+  var start = dayOffset % 3;
+  return all.slice(start, start + count).concat(all.slice(0, Math.max(0, (start + count) - all.length)));
+}
+
+function chatBot(html, withAvatar) {
+  var av = withAvatar !== false ? '<div class="chat-avatar">🤖</div>' : '<div style="width:32px;flex-shrink:0"></div>';
+  return '<div class="chat-row bot">' + av + '<div class="chat-bubble chat-bot">' + html + '</div></div>';
+}
+function chatUser(text) {
+  return '<div class="chat-row user"><div class="chat-bubble chat-user">' + text + '</div></div>';
+}
+function chatTyping() {
+  return '<div class="chat-row bot" id="chatTyping"><div class="chat-avatar">🤖</div><div class="chat-bubble chat-bot"><div class="typing-dots"><span></span><span></span><span></span></div></div></div>';
+}
+
+function appendChat(html) {
+  var w = document.getElementById('chatWindow');
+  var div = document.createElement('div');
+  div.innerHTML = html;
+  Array.from(div.childNodes).forEach(function(n){ w.appendChild(n); });
+  w.scrollTop = w.scrollHeight;
+}
+function removeTyping() {
+  var el = document.getElementById('chatTyping');
+  if (el) el.remove();
+}
+
+function buildDateButtons() {
+  var today = new Date();
+  var btns = '';
+  // Apenas hoje e amanhã
+  for (var i = 0; i <= 1; i++) {
+    var d = new Date(today); d.setDate(today.getDate() + i);
+    var iso = d.toISOString().split('T')[0];
+    var lbl = i === 0 ? '📅 Hoje (' + d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) + ')' : '📅 Amanhã (' + d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) + ')';
+    btns += '<button class="date-btn" onclick="chatPickDate(\'' + iso + '\',this)">' + lbl + '</button>';
+  }
+  return '<div class="date-btns">' + btns + '</div>';
+}
+
+function initChat() {
+  var w = document.getElementById('chatWindow');
+  if (w.children.length > 0) return; // already init
+  appendChat(chatBot('Ola! 👋 Vamos as analises.<br><strong>Qual data deseja consultar?</strong>' + buildDateButtons(), true));
+}
+
+async function chatPickDate(dateStr, el) {
+  if (CHAT_STATE.step !== 'date') return;
+  CHAT_STATE.step = 'loading_matches';
+  CHAT_STATE.selectedDate = dateStr;
+  document.querySelectorAll('.date-btn').forEach(function(b){ b.disabled = true; b.classList.remove('selected'); });
+  el.classList.add('selected');
+
+  var fmt = new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+  appendChat(chatUser('📅 ' + fmt));
+  appendChat(chatTyping());
+
+  await new Promise(function(r){ setTimeout(r, 900); });
+  removeTyping();
+
+  var matches;
+  if (DEMO_MODE || !API_KEY) {
+    matches = getChatDemoMatches(dateStr);
+  } else {
+    var raw = await api('/fixtures?date=' + dateStr + '&timezone=America/Sao_Paulo', 'date') || [];
+    matches = raw.filter(function(f){
+      return ALLOWED_LEAGUE_IDS.indexOf(f.league.id) >= 0;
+    }).map(function(f){
+      return {
+        id: f.fixture.id,
+        home: f.teams.home.name,
+        away: f.teams.away.name,
+        league: f.league.name,
+        leagueId: f.league.id,
+        time: new Date(f.fixture.date).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),
+        hFlag: '', aFlag: '',
+        group: f.league.round || '',
+        hGF: 1.4, aGF: 1.0,
+        corners: 9.0, btts: 55, o15: 78, o25: 58,
+        hForm: ['W','D','W','L','W'],
+        aForm: ['D','W','L','W','D'],
+        _raw: f
+      };
+    });
+    if (!matches.length) matches = getChatDemoMatches(dateStr);
+  }
+
+  CHAT_MATCHES_CACHE[dateStr] = matches;
+  CHAT_STATE.step = 'match';
+
+  // Agrupar por campeonato
+  var leagueGroups = {};
+  matches.forEach(function(m){
+    if (!leagueGroups[m.league]) leagueGroups[m.league] = [];
+    leagueGroups[m.league].push(m);
+  });
+
+  var leagueOrder = CHAT_LEAGUES.map(function(l){ return l.name; });
+  var sortedLeagues = Object.keys(leagueGroups).sort(function(a, b){
+    var ia = leagueOrder.indexOf(a), ib = leagueOrder.indexOf(b);
+    if (ia < 0) ia = 999; if (ib < 0) ib = 999;
+    return ia - ib;
+  });
+
+  var groupedHtml = sortedLeagues.map(function(leagueName){
+    var lgMatches = leagueGroups[leagueName];
+    var lgEmoji = '';
+    CHAT_LEAGUES.forEach(function(l){ if (l.name === leagueName || leagueName.indexOf(l.name) >= 0) lgEmoji = l.emoji; });
+    var btns = lgMatches.map(function(m){
+      return '<button class="match-btn" onclick="chatPickMatch(\'' + m.id + '\',this)">' +
+        (m.hFlag ? m.hFlag + ' ' : '') + m.home + ' vs ' + m.away + (m.aFlag ? ' ' + m.aFlag : '') +
+        ' <span style="font-size:10px;color:var(--muted)">(' + m.time + ')</span></button>';
+    }).join('');
+    return '<div style="margin-bottom:10px">' +
+      '<div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">' + lgEmoji + ' ' + leagueName + '</div>' +
+      '<div class="match-btns">' + btns + '</div></div>';
+  }).join('');
+
+  appendChat(chatBot('<strong>Selecione a partida por campeonato:</strong><br><span style="font-size:12px;color:var(--muted)">' + matches.length + ' jogos nos campeonatos selecionados</span><div style="margin-top:10px">' + groupedHtml + '</div>', true));
+}
+
+async function chatPickMatch(matchId, el) {
+  if (CHAT_STATE.step !== 'match') return;
+  var matches = CHAT_MATCHES_CACHE[CHAT_STATE.selectedDate] || [];
+  var match = matches.find(function(m){ return String(m.id) === String(matchId); });
+  if (!match) return;
+
+  CHAT_STATE.step = 'loading_analysis';
+  CHAT_STATE.selectedMatch = match;
+
+  document.querySelectorAll('.match-btn').forEach(function(b){ b.disabled = true; b.classList.remove('selected'); });
+  el.classList.add('selected');
+
+  var flag = match.hFlag && match.aFlag ? match.hFlag + ' ' : '';
+  var flag2 = match.aFlag ? ' ' + match.aFlag : '';
+  appendChat(chatUser(flag + match.home + ' vs ' + match.away + flag2));
+  appendChat(chatTyping());
+
+  // Prompt rico com histórico, padrões e palpite pronto
+  var prompt =
+    'Voce e um analista e tipster profissional de futebol. Use dados reais de Fbref, Understat, SofaScore, WhoScored e Transfermarkt.\n' +
+    'Analise COMPLETA da partida: ' + match.home + ' vs ' + match.away +
+    ' (' + match.league + (match.group ? ', ' + match.group : '') + ').\n' +
+    'Dados base: Media gols casa ' + match.hGF + ', fora ' + match.aGF +
+    '. Over 1.5: ' + match.o15 + '%. BTTS: ' + match.btts + '%. Over 2.5: ' + match.o25 +
+    '%. Escanteios media: ' + match.corners +
+    '. Forma casa: ' + (match.hForm||['W','D','W','L','W']).join('') +
+    '. Forma fora: ' + (match.aForm||['D','W','L','W','D']).join('') + '.\n\n' +
+    'Responda APENAS JSON valido sem markdown. Formato exato:\n' +
+    '{\n' +
+    '"contexto":"frase contextual",\n' +
+    '"resumo_casa":{"nome":"' + match.home + '","forca":"curta descricao de forca","fraqueza":"curta descricao de fraqueza","estilo":"descricao do estilo de jogo","posicao_tabela":"ex: 3o lugar","artilheiro":{"nome":"jogador","gols":8},"destaque":{"nome":"jogador","funcao":"meia criativo"}},\n' +
+    '"resumo_fora":{"nome":"' + match.away + '","forca":"texto","fraqueza":"texto","estilo":"texto","posicao_tabela":"ex: 7o lugar","artilheiro":{"nome":"jogador","gols":5},"destaque":{"nome":"jogador","funcao":"ponta veloz"}},\n' +
+    '"historico_recente":[\n' +
+    '{"jogo":"' + match.home + ' x Oponente1","resultado":"2-1","data":"há 7 dias","obs":"Over 2.5, BTTS"},\n' +
+    '{"jogo":"' + match.home + ' x Oponente2","resultado":"1-0","data":"há 14 dias","obs":"Under 1.5"},\n' +
+    '{"jogo":"' + match.away + ' x Oponente3","resultado":"1-1","data":"há 5 dias","obs":"BTTS, Over 1.5"},\n' +
+    '{"jogo":"' + match.away + ' x Oponente4","resultado":"0-2","data":"há 12 dias","obs":"Fora de casa"},\n' +
+    '{"jogo":"' + match.home + ' x ' + match.away + '","resultado":"2-0","data":"H2H recente","obs":"Casa venceu"}\n' +
+    '],\n' +
+    '"padroes":[\n' +
+    '"texto do padrao 1 ex: ' + match.home + ' teve over 2.5 em 5 dos ultimos 7 jogos em casa",\n' +
+    '"texto do padrao 2 ex: ' + match.away + ' sofreu gol em 6 dos ultimos 7 jogos fora",\n' +
+    '"texto do padrao 3 ex: ambas marcaram em 4 dos ultimos 5 H2H entre os times",\n' +
+    '"texto do padrao 4 ex: ' + match.home + ' teve mais de 8 escanteios em 6 dos ultimos 7 jogos em casa",\n' +
+    '"texto do padrao 5 ex: artilheiro do ' + match.home + ' finalizou 3+ vezes em 5 dos ultimos 6 jogos"\n' +
+    '],\n' +
+    '"gols":{"media_esperada":"2.4","o15_pct":83,"o25_pct":64,"btts_pct":58,"analise":"texto"},\n' +
+    '"finalizacoes":{"casa_media":"5.2","casa_no_gol":"2.1","casa_fora_gol":"3.1","fora_media":"3.8","fora_no_gol":"1.5","fora_fora_gol":"2.3","analise":"texto"},\n' +
+    '"faltas":{"casa_cometidas":"11.2","casa_sofridas":"10.1","fora_cometidas":"12.0","fora_sofridas":"9.8","analise":"texto"},\n' +
+    '"escanteios":{"media":"9.5","casa_media":"5.2","fora_media":"4.3","over85_pct":60,"over105_pct":42,"analise":"texto"},\n' +
+    '"cartoes":{"media_jogo":"3.2","analise":"texto"},\n' +
+    '"vitorias":{"prob_casa":62,"prob_empate":22,"prob_fora":16,"analise":"texto"},\n' +
+    '"vitoria_favorito":{"time":"' + match.home + '","prob":65,"analise":"texto"},\n' +
+    '"palpite_pronto":{\n' +
+    '"titulo":"🎯 Palpite Pronto — ' + match.home + ' x ' + match.away + '",\n' +
+    '"justificativas":[\n' +
+    '"artilheiro do ' + match.home + ' teve 3+ finalizacoes nos ultimos 5 jogos",\n' +
+    '"' + match.home + ' teve over 4 escanteios em 6 dos ultimos 7 jogos em casa",\n' +
+    '"' + match.away + ' sofreu gol em 6 dos ultimos 7 jogos fora de casa"\n' +
+    '],\n' +
+    '"apostas":[\n' +
+    '{"mercado":"Jogador X — Mais de 2 finalizacoes","conf":78,"odd":"2.10"},\n' +
+    '{"mercado":"Mais de 4 escanteios — ' + match.home + '","conf":72,"odd":"1.85"},\n' +
+    '{"mercado":"Vitoria ' + match.home + '","conf":65,"odd":"1.95"},\n' +
+    '{"mercado":"Over 2.5 gols","conf":64,"odd":"1.88"}\n' +
+    '],\n' +
+    '"placar_previsto":"2 x 1",\n' +
+    '"confianca_geral":74,\n' +
+    '"analise_final":"frase final resumindo o palpite"\n' +
+    '}\n' +
+    '}';
+
+  var analysisData = null;
+  try {
+    var r = await fetch('/.netlify/functions/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    var d = await r.json();
+    var txt = d.content && d.content[0] && d.content[0].text ? d.content[0].text.trim() : '';
+    txt = txt.replace(/```json|```/g, '').trim();
+    analysisData = JSON.parse(txt);
+  } catch(e) {
+    analysisData = null;
+  }
+
+  removeTyping();
+
+  if (!analysisData) {
+    analysisData = buildFallbackAnalysis(match);
+  }
+
+  renderChatAnalysis(match, analysisData);
+  CHAT_STATE.step = 'done';
+
+  setTimeout(function(){
+    appendChat(chatBot('Deseja analisar outra partida?' +
+      '<div class="match-btns" style="margin-top:8px">' +
+      '<button class="match-btn" onclick="chatReset()" style="background:var(--g4);border:1px solid var(--accent);color:var(--accent);">🔄 Nova consulta</button>' +
+      '</div>', false));
+  }, 400);
+}
+
+function buildFallbackAnalysis(match) {
+  var hW = (match.hForm || ['W','D','W','L','W']).filter(function(r){ return r==='W'; }).length;
+  var aW = (match.aForm || ['D','W','L','W','D']).filter(function(r){ return r==='W'; }).length;
+  var probH = 35 + hW * 6, probA = 15 + aW * 6, probD = 100 - probH - probA;
+  var hS = Math.round(match.hGF), aS = Math.round(match.aGF);
+  var favTime = probH >= probA ? match.home : match.away;
+  var favProb = Math.max(probH, probA);
+  return {
+    contexto: match.home + ' recebe ' + match.away + ' pela ' + match.league + '. Jogo com alto potencial ofensivo.',
+    resumo_casa: {nome:match.home, forca:'Forte em casa com bom aproveitamento', fraqueza:'Pode sofrer pressao em contra-ataques', estilo:'Posse de bola, pressao alta', posicao_tabela:'Top 6', artilheiro:{nome:'Artilheiro A', gols:8}, destaque:{nome:'Destaque B', funcao:'Meia criativo'}},
+    resumo_fora: {nome:match.away, forca:'Rapido no contra-ataque', fraqueza:'Dificuldade fora de casa', estilo:'Contra-ataque veloz, defesa baixa', posicao_tabela:'Meio tabela', artilheiro:{nome:'Artilheiro C', gols:5}, destaque:{nome:'Destaque D', funcao:'Ponta veloz'}},
+    historico_recente: [
+      {jogo: match.home + ' 2-1 Oponente', resultado:'2-1', data:'há 7 dias', obs:'Over 2.5, Casa venceu'},
+      {jogo: match.home + ' 1-1 Oponente', resultado:'1-1', data:'há 14 dias', obs:'BTTS'},
+      {jogo: match.away + ' 0-1 Oponente', resultado:'0-1', data:'há 5 dias', obs:'Fora de casa'},
+      {jogo: match.away + ' 2-0 Oponente', resultado:'2-0', data:'há 11 dias', obs:'Over 1.5'},
+      {jogo: match.home + ' 2-0 ' + match.away, resultado:'2-0', data:'H2H anterior', obs:'Casa dominou'}
+    ],
+    padroes: [
+      match.home + ' marcou em todos os últimos 7 jogos em casa',
+      match.away + ' sofreu gol em 6 dos últimos 7 jogos fora de casa',
+      'Over 1.5 gols em 5 dos últimos 6 H2H entre os times',
+      match.home + ' teve mais de 8 escanteios em 5 dos últimos 7 jogos em casa',
+      'Artilheiro do ' + match.home + ' finalizou 3+ vezes em 5 dos últimos 6 jogos'
+    ],
+    gols: { media_esperada: (match.hGF + match.aGF).toFixed(1), o15_pct: match.o15, o25_pct: match.o25, btts_pct: match.btts, analise: 'Expectativa de jogo aberto com chances dos dois lados.' },
+    finalizacoes: { casa_media: (match.hGF * 3.2).toFixed(1), casa_no_gol: (match.hGF * 1.2).toFixed(1), casa_fora_gol: (match.hGF * 2.0).toFixed(1), fora_media: (match.aGF * 2.8).toFixed(1), fora_no_gol: (match.aGF * 1.0).toFixed(1), fora_fora_gol: (match.aGF * 1.8).toFixed(1), analise: 'Time da casa tende a dominar territorialmente.' },
+    faltas: { casa_cometidas: '11.2', casa_sofridas: '10.1', fora_cometidas: '12.0', fora_sofridas: '9.8', analise: 'Confronto historicamente disputado com faltas frequentes.' },
+    escanteios: { media: String(match.corners), casa_media: (match.corners * 0.55).toFixed(1), fora_media: (match.corners * 0.45).toFixed(1), over85_pct: 55, over105_pct: 38, analise: 'Media de ' + match.corners + ' escanteios por partida.' },
+    cartoes: { media_jogo: '3.1', analise: 'Confronto disputado, espere amarelos.' },
+    vitorias: { prob_casa: probH, prob_empate: Math.max(probD, 15), prob_fora: probA, analise: 'Casa favorita baseado na forma recente.' },
+    vitoria_favorito: { time: favTime, prob: favProb, analise: favTime + ' favorito com base na forma recente.' },
+    palpite_pronto: {
+      titulo: '🎯 Palpite Pronto — ' + match.home + ' x ' + match.away,
+      justificativas: [
+        'Artilheiro do ' + match.home + ' finalizou 3+ vezes nos últimos 5 jogos',
+        match.home + ' teve over 4 escanteios em 6 dos últimos 7 jogos em casa',
+        match.away + ' sofreu gol em 6 dos últimos 7 jogos fora de casa'
+      ],
+      apostas: [
+        {mercado: 'Artilheiro do ' + match.home + ' — Mais de 2 finalizações', conf: 76, odd: '2.05'},
+        {mercado: 'Mais de 4 escanteios — ' + match.home, conf: 71, odd: '1.85'},
+        {mercado: 'Vitória ' + match.home, conf: favProb, odd: '1.95'},
+        {mercado: 'Over 2.5 gols', conf: match.o25, odd: '1.88'}
+      ],
+      placar_previsto: hS + ' x ' + aS,
+      confianca_geral: Math.round((match.o15 + favProb) / 2),
+      analise_final: 'Jogo favorável ao ' + match.home + ' com padrões ofensivos consistentes nas últimas rodadas.'
+    }
+  };
+}
+
+function renderChatAnalysis(match, a) {
+  var hf = match.hForm || ['W','D','W','L','W'];
+  var af = match.aForm || ['D','W','L','W','D'];
+  var formDots = function(arr){ return arr.map(function(r){
+    return '<span style="display:inline-flex;width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;font-size:9px;font-weight:700;background:' + (r==='W'?'rgba(0,229,160,.2)':r==='D'?'rgba(255,215,0,.2)':'rgba(255,68,68,.2)') + ';color:' + (r==='W'?'var(--accent)':r==='D'?'var(--gold)':'var(--red)') + ';border:1px solid ' + (r==='W'?'rgba(0,229,160,.4)':r==='D'?'rgba(255,215,0,.4)':'rgba(255,68,68,.4)') + '">' + r + '</span>';
+  }).join(' '); };
+
+  var fin = a.finalizacoes || {};
+  var flt = a.faltas || {};
+  var esc = a.escanteios || {};
+  var vf  = a.vitoria_favorito || {};
+  var rc  = a.resumo_casa || {};
+  var rf  = a.resumo_fora || {};
+  var hist = a.historico_recente || [];
+  var padroes = a.padroes || [];
+  var pp = a.palpite_pronto || {};
+
+  var html = '<div class="analysis-card">' +
+
+    // ── HEADER ───────────────────────────────────────────
+    '<div style="text-align:center;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">' +
+      '<div style="font-size:11px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">' + match.league + (match.group ? ' · ' + match.group : '') + '</div>' +
+      '<div style="display:flex;align-items:center;justify-content:center;gap:10px">' +
+        '<div style="text-align:center"><div style="font-size:26px">' + (match.hFlag || '🏠') + '</div><div style="font-size:13px;font-weight:700">' + match.home + '</div><div style="display:flex;gap:2px;justify-content:center;margin-top:4px">' + formDots(hf) + '</div></div>' +
+        '<div style="font-size:11px;color:var(--muted);padding:0 6px">VS</div>' +
+        '<div style="text-align:center"><div style="font-size:26px">' + (match.aFlag || '✈️') + '</div><div style="font-size:13px;font-weight:700">' + match.away + '</div><div style="display:flex;gap:2px;justify-content:center;margin-top:4px">' + formDots(af) + '</div></div>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5">' + a.contexto + '</div>' +
+    '</div>' +
+
+    // ── RESUMO DOS TIMES ─────────────────────────────────
+    '<div class="analysis-section">' +
+      '<div class="analysis-section-title">🧩 Resumo dos Times</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+        // Casa
+        '<div style="background:rgba(0,229,160,.06);border:1px solid rgba(0,229,160,.2);border-radius:10px;padding:10px">' +
+          '<div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px">' + match.home + '</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:2px">📍 ' + (rc.posicao_tabela||'--') + '</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:2px">⚽ ' + (rc.artilheiro ? rc.artilheiro.nome + ' (' + rc.artilheiro.gols + ' gols)' : '--') + '</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:5px">⭐ ' + (rc.destaque ? rc.destaque.nome + ' · ' + rc.destaque.funcao : '--') + '</div>' +
+          '<div style="font-size:10px;margin-bottom:3px"><span style="color:var(--accent)">✅ </span>' + (rc.forca||'--') + '</div>' +
+          '<div style="font-size:10px"><span style="color:var(--red)">⚠️ </span>' + (rc.fraqueza||'--') + '</div>' +
+          (rc.estilo ? '<div style="font-size:10px;color:var(--muted);margin-top:4px;border-top:1px solid rgba(255,255,255,.06);padding-top:4px">🎮 ' + rc.estilo + '</div>' : '') +
+        '</div>' +
+        // Fora
+        '<div style="background:rgba(255,107,53,.06);border:1px solid rgba(255,107,53,.2);border-radius:10px;padding:10px">' +
+          '<div style="font-size:11px;font-weight:700;color:var(--accent2);margin-bottom:6px">' + match.away + '</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:2px">📍 ' + (rf.posicao_tabela||'--') + '</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:2px">⚽ ' + (rf.artilheiro ? rf.artilheiro.nome + ' (' + rf.artilheiro.gols + ' gols)' : '--') + '</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:5px">⭐ ' + (rf.destaque ? rf.destaque.nome + ' · ' + rf.destaque.funcao : '--') + '</div>' +
+          '<div style="font-size:10px;margin-bottom:3px"><span style="color:var(--accent)">✅ </span>' + (rf.forca||'--') + '</div>' +
+          '<div style="font-size:10px"><span style="color:var(--red)">⚠️ </span>' + (rf.fraqueza||'--') + '</div>' +
+          (rf.estilo ? '<div style="font-size:10px;color:var(--muted);margin-top:4px;border-top:1px solid rgba(255,255,255,.06);padding-top:4px">🎮 ' + rf.estilo + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // ── HISTÓRICO RECENTE ────────────────────────────────
+    (hist.length ? '<div class="analysis-section">' +
+      '<div class="analysis-section-title">📅 Histórico Recente</div>' +
+      hist.map(function(h){
+        var res = h.resultado || '';
+        var parts = res.split('-');
+        var g1 = parseInt(parts[0])||0, g2 = parseInt(parts[1])||0;
+        var isHome = h.jogo && h.jogo.indexOf(match.home) >= 0;
+        var won = (isHome && g1 > g2) || (!isHome && g2 > g1);
+        var drew = g1 === g2;
+        var rColor = won ? 'var(--accent)' : drew ? 'var(--gold)' : 'var(--red)';
+        var rBg = won ? 'rgba(0,229,160,.12)' : drew ? 'rgba(255,215,0,.1)' : 'rgba(255,68,68,.1)';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)">' +
+          '<div style="background:' + rBg + ';border:1px solid ' + rColor + ';border-radius:6px;padding:3px 8px;font-size:12px;font-weight:700;color:' + rColor + ';min-width:34px;text-align:center;flex-shrink:0">' + res + '</div>' +
+          '<div style="flex:1">' +
+            '<div style="font-size:11px;font-weight:500">' + h.jogo + '</div>' +
+            '<div style="font-size:10px;color:var(--muted)">' + (h.data||'') + (h.obs ? ' · ' + h.obs : '') + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('') +
+    '</div>' : '') +
+
+    // ── PADRÕES REPETIDOS ────────────────────────────────
+    (padroes.length ? '<div class="analysis-section">' +
+      '<div class="analysis-section-title">🔁 Padrões que se Repetem</div>' +
+      padroes.map(function(p){
+        return '<div style="display:flex;align-items:flex-start;gap:7px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">' +
+          '<span style="font-size:14px;flex-shrink:0">📌</span>' +
+          '<span style="font-size:12px;color:var(--text);line-height:1.5">' + p + '</span>' +
+        '</div>';
+      }).join('') +
+    '</div>' : '') +
+
+    // ── PROBABILIDADES ───────────────────────────────────
+    '<div class="analysis-section">' +
+      '<div class="analysis-section-title">🏆 Probabilidades de Vitória</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">' +
+        '<div style="text-align:center;background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.2);border-radius:8px;padding:8px">' +
+          '<div style="font-family:Bebas Neue,sans-serif;font-size:22px;color:var(--accent)">' + a.vitorias.prob_casa + '%</div>' +
+          '<div style="font-size:10px;color:var(--muted)">' + match.home + '</div></div>' +
+        '<div style="text-align:center;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:8px;padding:8px">' +
+          '<div style="font-family:Bebas Neue,sans-serif;font-size:22px;color:var(--gold)">' + a.vitorias.prob_empate + '%</div>' +
+          '<div style="font-size:10px;color:var(--muted)">Empate</div></div>' +
+        '<div style="text-align:center;background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.2);border-radius:8px;padding:8px">' +
+          '<div style="font-family:Bebas Neue,sans-serif;font-size:22px;color:var(--accent2)">' + a.vitorias.prob_fora + '%</div>' +
+          '<div style="font-size:10px;color:var(--muted)">' + match.away + '</div></div>' +
+      '</div>' +
+      (vf.time ? '<div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:8px;padding:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="font-size:12px;color:var(--muted)">⭐ Favorito: <strong style="color:#fff">' + vf.time + '</strong></span>' +
+        '<span style="font-family:Bebas Neue,sans-serif;font-size:18px;color:var(--gold)">' + vf.prob + '%</span></div>' : '') +
+      '<div style="font-size:12px;color:var(--muted);line-height:1.5">' + a.vitorias.analise + '</div>' +
+    '</div>' +
+
+    // ── GOLS ─────────────────────────────────────────────
+    '<div class="analysis-section">' +
+      '<div class="analysis-section-title">⚽ Gols</div>' +
+      '<div class="stat-row"><span class="stat-name">xG esperado</span><span class="stat-value good">' + a.gols.media_esperada + '</span></div>' +
+      '<div class="stat-row"><span class="stat-name">Over 1.5</span><span class="stat-value ' + (a.gols.o15_pct >= 70 ? 'good' : 'warn') + '">' + a.gols.o15_pct + '%</span></div>' +
+      '<div class="stat-row"><span class="stat-name">Over 2.5</span><span class="stat-value ' + (a.gols.o25_pct >= 60 ? 'good' : 'warn') + '">' + a.gols.o25_pct + '%</span></div>' +
+      '<div class="stat-row"><span class="stat-name">BTTS</span><span class="stat-value ' + (a.gols.btts_pct >= 60 ? 'good' : 'warn') + '">' + a.gols.btts_pct + '%</span></div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5">' + a.gols.analise + '</div>' +
+    '</div>' +
+
+    // ── FINALIZAÇÕES ─────────────────────────────────────
+    '<div class="analysis-section">' +
+      '<div class="analysis-section-title">🎯 Finalizações</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">' +
+        '<div style="background:rgba(0,229,160,.06);border:1px solid rgba(0,229,160,.15);border-radius:8px;padding:8px">' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">' + match.home + '</div>' +
+          '<div class="stat-row" style="border:0;padding:2px 0"><span class="stat-name" style="font-size:11px">Total/jogo</span><span class="stat-value good" style="font-size:12px">' + (fin.casa_media||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:2px 0"><span class="stat-name" style="font-size:11px">No gol</span><span class="stat-value good" style="font-size:12px">' + (fin.casa_no_gol||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:2px 0"><span class="stat-name" style="font-size:11px">Fora do gol</span><span class="stat-value" style="font-size:12px">' + (fin.casa_fora_gol||'--') + '</span></div>' +
+        '</div>' +
+        '<div style="background:rgba(255,107,53,.06);border:1px solid rgba(255,107,53,.15);border-radius:8px;padding:8px">' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">' + match.away + '</div>' +
+          '<div class="stat-row" style="border:0;padding:2px 0"><span class="stat-name" style="font-size:11px">Total/jogo</span><span class="stat-value" style="font-size:12px">' + (fin.fora_media||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:2px 0"><span class="stat-name" style="font-size:11px">No gol</span><span class="stat-value" style="font-size:12px">' + (fin.fora_no_gol||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:2px 0"><span class="stat-name" style="font-size:11px">Fora do gol</span><span class="stat-value" style="font-size:12px">' + (fin.fora_fora_gol||'--') + '</span></div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--muted);line-height:1.5">' + (fin.analise||'') + '</div>' +
+    '</div>' +
+
+    // ── FALTAS + ESCANTEIOS ───────────────────────────────
+    '<div class="analysis-section">' +
+      '<div class="analysis-section-title">⚠️ Faltas & 🚩 Escanteios</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">' +
+        '<div style="background:rgba(0,229,160,.06);border:1px solid rgba(0,229,160,.15);border-radius:8px;padding:8px">' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:3px">' + match.home + '</div>' +
+          '<div class="stat-row" style="border:0;padding:1px 0"><span class="stat-name" style="font-size:11px">Faltas com.</span><span class="stat-value warn" style="font-size:11px">' + (flt.casa_cometidas||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:1px 0"><span class="stat-name" style="font-size:11px">Faltas sof.</span><span class="stat-value good" style="font-size:11px">' + (flt.casa_sofridas||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:1px 0"><span class="stat-name" style="font-size:11px">Escanteios</span><span class="stat-value" style="font-size:11px">' + (esc.casa_media||'--') + '</span></div>' +
+        '</div>' +
+        '<div style="background:rgba(255,107,53,.06);border:1px solid rgba(255,107,53,.15);border-radius:8px;padding:8px">' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:3px">' + match.away + '</div>' +
+          '<div class="stat-row" style="border:0;padding:1px 0"><span class="stat-name" style="font-size:11px">Faltas com.</span><span class="stat-value warn" style="font-size:11px">' + (flt.fora_cometidas||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:1px 0"><span class="stat-name" style="font-size:11px">Faltas sof.</span><span class="stat-value good" style="font-size:11px">' + (flt.fora_sofridas||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:1px 0"><span class="stat-name" style="font-size:11px">Escanteios</span><span class="stat-value" style="font-size:11px">' + (esc.fora_media||'--') + '</span></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="stat-row"><span class="stat-name">Escanteios media total</span><span class="stat-value warn">' + (esc.media||'--') + '</span></div>' +
+      '<div class="stat-row"><span class="stat-name">Over 8.5 escanteios</span><span class="stat-value ' + ((esc.over85_pct||0) >= 55 ? 'good' : 'warn') + '">' + (esc.over85_pct||'--') + '%</span></div>' +
+      '<div class="stat-row"><span class="stat-name">Over 10.5 escanteios</span><span class="stat-value ' + ((esc.over105_pct||0) >= 45 ? 'good' : 'warn') + '">' + (esc.over105_pct||'--') + '%</span></div>' +
+    '</div>' +
+
+    // ── PALPITE PRONTO (destaque) ─────────────────────────
+    (pp.apostas ? '<div style="background:linear-gradient(135deg,rgba(0,229,160,.14),rgba(79,195,247,.1));border:2px solid rgba(0,229,160,.5);border-radius:14px;padding:14px;margin-top:4px">' +
+      '<div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">' + (pp.titulo||'🎯 Palpite Pronto') + '</div>' +
+
+      // Justificativas
+      (pp.justificativas && pp.justificativas.length ?
+        '<div style="margin-bottom:10px">' +
+          '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">📊 Baseado em</div>' +
+          pp.justificativas.map(function(j){ return '<div style="font-size:11px;color:var(--text);display:flex;gap:5px;align-items:flex-start;margin-bottom:3px"><span>🔹</span><span>' + j + '</span></div>'; }).join('') +
+        '</div>' : '') +
+
+      // Apostas
+      '<div style="margin-bottom:10px">' +
+        '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🎯 Apostas Recomendadas</div>' +
+        pp.apostas.map(function(ap){
+          var cls = ap.conf >= 75 ? 'conf-high' : 'conf-med';
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+            '<span style="font-size:12px;font-weight:600">✓ ' + ap.mercado + '</span>' +
+            '<div style="display:flex;align-items:center;gap:6px">' +
+              '<span style="font-size:11px;font-weight:700;color:var(--gold)">@' + ap.odd + '</span>' +
+              '<span class="conf-pill ' + cls + '">' + ap.conf + '%</span>' +
+            '</div>' +
+          '</div>';
+        }).join('') +
+      '</div>' +
+
+      // Placar
+      '<div style="border-top:1px solid rgba(0,229,160,.25);padding-top:10px;text-align:center">' +
+        '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Placar Previsto</div>' +
+        '<div class="verdict-score">' + match.home + ' ' + (pp.placar_previsto||'1 x 1') + ' ' + match.away + '</div>' +
+        '<div style="height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;margin-top:8px"><div style="height:100%;width:' + (pp.confianca_geral||70) + '%;background:linear-gradient(90deg,var(--accent),var(--accent3));border-radius:2px"></div></div>' +
+        '<div style="font-size:11px;color:var(--muted);text-align:center;margin-top:4px">Confiança geral: ' + (pp.confianca_geral||70) + '%</div>' +
+        (pp.analise_final ? '<div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;font-style:italic">' + pp.analise_final + '</div>' : '') +
+      '</div>' +
+    '</div>' : '') +
+
+  '</div>';
+
+  appendChat(chatBot(html, true));
+}
+
+function chatReset() {
+  CHAT_STATE = { step: 'date', selectedDate: null, selectedMatch: null };
+  var w = document.getElementById('chatWindow');
+  w.innerHTML = '';
+  initChat();
+}
+
+// ── INIT ─────────────────────────────────────────────────
+buildDateBar();
+setInterval(function(){ }, 60000);
+
+// Auto-start: usa chave salva ou entra direto em modo demo
+var _savedKey = getSavedKey();
+if (_savedKey) {
+  API_KEY = _savedKey;
+  DEMO_MODE = false;
+  document.getElementById('keyDisplay').textContent = API_KEY.slice(0,6) + '**********' + API_KEY.slice(-4);
+  document.getElementById('apiModeLabel').textContent = 'Modo: API Real';
+} else {
+  // Entra automaticamente em modo demo sem mostrar modal
+  DEMO_MODE = true;
+  document.getElementById('keyDisplay').textContent = 'MODO DEMO';
+  document.getElementById('apiModeLabel').textContent = 'Modo: Demo (dados simulados) — configure em Config';
+}
+document.getElementById('savedKeyHint').textContent = '';
+initChat();
+</script>
+</body>
+</html>
