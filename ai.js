@@ -26,7 +26,7 @@ exports.handler = async function (event) {
     }
 
     // Limite de segurança para não explodir custo por chamada
-    const safeMaxTokens = Math.min(Number(max_tokens) || 1000, 2500);
+    const safeMaxTokens = Math.min(Number(max_tokens) || 1000, 4500);
 
     console.log('Chamando Anthropic. Modelo:', model || 'claude-sonnet-5', 'max_tokens:', safeMaxTokens);
 

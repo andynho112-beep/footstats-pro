@@ -326,6 +326,36 @@ var SEASON   = (new Date().getMonth() < 6) ? (new Date().getFullYear() - 1) : ne
 var TODAY    = new Date().toISOString().split('T')[0];
 var DEMO_MODE = false;
 
+// Restaura a chave salva (ou entra em modo demo) o mais cedo possível,
+// isolado em try/catch para nunca ser bloqueado por outro erro do app.
+try {
+  var _savedKeyEarly = getSavedKey();
+  if (_savedKeyEarly) {
+    API_KEY = _savedKeyEarly;
+    DEMO_MODE = false;
+  } else {
+    DEMO_MODE = true;
+  }
+} catch(e) {
+  DEMO_MODE = true;
+}
+
+function atualizarTelaChaveAPI() {
+  try {
+    var kd = document.getElementById('keyDisplay');
+    var am = document.getElementById('apiModeLabel');
+    if (!kd || !am) return;
+    if (API_KEY && !DEMO_MODE) {
+      kd.textContent = API_KEY.slice(0,6) + '**********' + API_KEY.slice(-4);
+      am.textContent = 'Modo: API Real';
+    } else {
+      kd.textContent = 'MODO DEMO';
+      am.textContent = 'Modo: Demo (dados simulados) — configure em Config';
+    }
+  } catch(e) {}
+}
+atualizarTelaChaveAPI();
+
 var STATE = {
   games: [], stats: {}, alerts: [],
   selectedDate: TODAY,
@@ -2063,23 +2093,14 @@ function chatReset() {
 buildDateBar();
 setInterval(function(){ }, 60000);
 
-// Auto-start: usa chave salva ou entra direto em modo demo
-var _savedKey = getSavedKey();
-if (_savedKey) {
-  API_KEY = _savedKey;
-  DEMO_MODE = false;
-  document.getElementById('keyDisplay').textContent = API_KEY.slice(0,6) + '**********' + API_KEY.slice(-4);
-  document.getElementById('apiModeLabel').textContent = 'Modo: API Real';
-} else {
-  // Entra automaticamente em modo demo sem mostrar modal
-  DEMO_MODE = true;
-  document.getElementById('keyDisplay').textContent = 'MODO DEMO';
-  document.getElementById('apiModeLabel').textContent = 'Modo: Demo (dados simulados) — configure em Config';
-}
-document.getElementById('savedKeyHint').textContent = '';
+// A chave/modo já foi restaurada no início do script (mais seguro).
+// Aqui só garantimos que a tela reflita o estado atual.
+atualizarTelaChaveAPI();
+try { document.getElementById('savedKeyHint').textContent = ''; } catch(e) {}
 initChat();
 </script>
 <script>
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function(){
     navigator.serviceWorker.register('/service-worker.js').catch(function(){});
