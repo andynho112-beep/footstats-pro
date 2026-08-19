@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script>
+// ── TRAVA DE ACESSO ────────────────────────────────────────
+// Só permite entrar quem tem plano ativo (vitalicio, ou mensal
+// dentro da validade) salvo pelo footstats_auth.html.
+(function(){
+  function temAcessoValido(a){
+    if (!a || !a.email) return false;
+    if (a.plano === 'vitalicio') return true;
+    if (a.plano === 'mensal' && a.expira_em) return new Date(a.expira_em) > new Date();
+    return false;
+  }
+  try {
+    var raw = localStorage.getItem('fsp_access');
+    var a = raw ? JSON.parse(raw) : null;
+    if (!temAcessoValido(a)) {
+      window.location.replace('footstats_auth.html');
+    }
+  } catch(e) {
+    window.location.replace('footstats_auth.html');
+  }
+})();
+</script>
+<meta charset="UTF-8">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0a0e1a">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FootStats">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>FootStats Pro v27</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{--g1:#0a0e1a;--g2:#0f1526;--g3:#151d35;--g4:#1a2540;--accent:#00e5a0;--accent2:#ff6b35;--accent3:#4fc3f7;--gold:#ffd700;--red:#ff4444;--text:#e8eaf6;--muted:#7986cb;--card:rgba(255,255,255,0.04);--border:rgba(255,255,255,0.08);}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--g1);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+.header{background:linear-gradient(135deg,var(--g2),var(--g4));border-bottom:1px solid var(--border);padding:12px 16px;position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--accent);letter-spacing:2px;}
+.logo span{color:var(--accent2);}
+.live-badge{background:var(--red);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;display:flex;align-items:center;gap:5px;animation:pulse 1.5s infinite;}
+.live-dot{width:6px;height:6px;background:#fff;border-radius:50%;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.notif-btn{background:var(--card);border:1px solid var(--border);color:var(--muted);width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;position:relative;}
+.notif-badge{position:absolute;top:-3px;right:-3px;background:var(--red);color:#fff;width:16px;height:16px;border-radius:50%;font-size:10px;display:flex;align-items:center;justify-content:center;}
+.nav{display:flex;background:var(--g2);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;}
+.nav::-webkit-scrollbar{display:none;}
+.nav-btn{flex:0 0 auto;padding:12px 16px;font-size:13px;font-weight:500;color:var(--muted);background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;}
+.nav-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.main{padding:16px;max-width:480px;margin:0 auto;}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading{display:flex;flex-direction:column;align-items:center;gap:12px;padding:50px 20px;color:var(--muted);font-size:13px;}
+.section{display:none;}
+.section.active{display:block;}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.section-title{font-size:16px;font-weight:600;}
+.section-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(0,229,160,.15);color:var(--accent);border:1px solid rgba(0,229,160,.3);}
+.date-bar{display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;scrollbar-width:none;}
+.date-bar::-webkit-scrollbar{display:none;}
+.date-chip{flex:0 0 auto;padding:8px 14px;border-radius:20px;font-size:12px;font-weight:500;background:var(--card);border:1px solid var(--border);cursor:pointer;color:var(--muted);transition:all .2s;}
+.date-chip.active{background:rgba(0,229,160,.15);border-color:var(--accent);color:var(--accent);}
+.game-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;margin-bottom:12px;}
+.game-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
+.game-card.high::before{background:var(--accent);}
+.game-card.medium::before{background:var(--gold);}
+.game-card.low::before{background:var(--muted);}
+.game-card.selected{border-color:var(--accent);background:rgba(0,229,160,.06);}
+.game-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.game-league{font-size:11px;color:var(--muted);}
+.game-time{font-size:11px;padding:3px 8px;border-radius:10px;background:rgba(79,195,247,.15);color:var(--accent3);}
+.game-time.live{background:rgba(255,68,68,.15);color:var(--red);animation:pulse 1.5s infinite;}
+.game-teams{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.team-info{text-align:center;flex:1;}
+.team-name{font-size:13px;font-weight:600;line-height:1.3;}
+.form-row{display:flex;gap:3px;justify-content:center;margin-top:4px;}
+.fd{width:15px;height:15px;border-radius:50%;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.fd.W{background:rgba(0,229,160,.2);color:var(--accent);border:1px solid rgba(0,229,160,.4);}
+.fd.D{background:rgba(255,215,0,.2);color:var(--gold);border:1px solid rgba(255,215,0,.4);}
+.fd.L{background:rgba(255,68,68,.2);color:var(--red);border:1px solid rgba(255,68,68,.4);}
+.vs-box{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--muted);padding:0 8px;text-align:center;}
+.score-live{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:4px;text-align:center;}
+.chips{display:flex;gap:6px;flex-wrap:wrap;}
+.chip{font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid;font-weight:500;}
+.chip.g{border-color:rgba(0,229,160,.4);color:var(--accent);background:rgba(0,229,160,.08);}
+.chip.a{border-color:rgba(255,215,0,.4);color:var(--gold);background:rgba(255,215,0,.08);}
+.chip.b{border-color:rgba(79,195,247,.4);color:var(--accent3);background:rgba(79,195,247,.08);}
+.detail{background:var(--g3);border:1px solid var(--border);border-radius:14px;padding:14px;margin-top:10px;display:none;}
+.detail.open{display:block;animation:fadeIn .3s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.tabs{display:flex;background:rgba(255,255,255,.04);border-radius:10px;padding:3px;margin-bottom:12px;}
+.tb{flex:1;padding:7px;font-size:12px;font-weight:500;background:none;border:none;color:var(--muted);border-radius:8px;cursor:pointer;transition:all .2s;}
+.tb.active{background:var(--g4);color:var(--text);}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.sc{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+.sl{font-size:11px;color:var(--muted);margin-bottom:4px;}
+.sv{font-size:19px;font-weight:600;}
+.ss{font-size:11px;color:var(--muted);margin-top:2px;}
+.pt{height:26px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden;display:flex;}
+.ph{height:100%;background:rgba(0,229,160,.5);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;min-width:28px;}
+.pa{flex:1;background:rgba(255,107,53,.5);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;}
+.pl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px;}
+.h2h-t{width:100%;border-collapse:collapse;font-size:12px;}
+.h2h-t th{color:var(--muted);font-weight:500;padding:5px 3px;border-bottom:1px solid var(--border);text-align:center;}
+.h2h-t td{padding:7px 3px;text-align:center;border-bottom:1px solid rgba(255,255,255,.04);}
+.hw{color:var(--accent);font-weight:700;}
+.aw{color:var(--accent2);font-weight:700;}
+.dr{color:var(--gold);font-weight:700;}
+.conf-bar{height:4px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:10px;overflow:hidden;}
+.conf-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent3));border-radius:2px;}
+.tip-of-day{background:linear-gradient(135deg,rgba(0,229,160,.1),rgba(79,195,247,.08));border:1px solid rgba(0,229,160,.3);border-radius:16px;padding:16px;margin-bottom:20px;position:relative;overflow:hidden;}
+.tip-label{font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.tip-match{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;margin-bottom:6px;}
+.tip-tip{display:inline-block;background:var(--accent);color:var(--g1);font-size:13px;font-weight:700;padding:4px 12px;border-radius:20px;margin-bottom:8px;}
+.tip-stats{display:flex;gap:12px;flex-wrap:wrap;}
+.tip-stat{font-size:12px;color:var(--muted);}
+.tip-stat span{color:var(--text);font-weight:500;}
+.alert-banner{background:linear-gradient(135deg,rgba(255,215,0,.15),rgba(255,107,53,.08));border:1px solid rgba(255,215,0,.5);border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px;}
+.alert-title{font-size:13px;font-weight:700;color:var(--gold);}
+.alert-desc{font-size:12px;color:var(--muted);margin-top:2px;}
+.report-card{background:linear-gradient(135deg,rgba(79,195,247,.08),rgba(0,229,160,.06));border:1px solid rgba(79,195,247,.2);border-radius:16px;padding:16px;margin-bottom:16px;}
+.ri{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);}
+.ri:last-child{border:none;}
+.rl{font-size:13px;color:var(--muted);}
+.rv{font-size:13px;font-weight:600;}
+.rv.p{color:var(--accent);}
+.news-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;gap:10px;}
+.settings-card{background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden;}
+.settings-item{display:flex;align-items:center;justify-content:space-between;padding:14px;border-bottom:1px solid var(--border);}
+.settings-item:last-child{border:none;}
+.toggle{width:44px;height:24px;background:rgba(255,255,255,.12);border-radius:12px;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0;}
+.toggle.on{background:var(--accent);}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:transform .2s;}
+.toggle.on::after{transform:translateX(20px);}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;}
+.modal-box{background:var(--g3);border:1px solid var(--border);border-radius:20px;padding:24px;width:100%;max-width:420px;}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--accent);letter-spacing:1px;margin-bottom:10px;}
+.modal-desc{font-size:13px;color:var(--muted);line-height:1.8;margin-bottom:18px;}
+.modal-input{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:13px;font-family:monospace;outline:none;margin-bottom:12px;}
+.modal-input:focus{border-color:var(--accent);}
+.modal-row{display:flex;gap:10px;}
+.btn-primary{flex:1;background:var(--accent);color:var(--g1);border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.btn-demo{flex:1;background:rgba(255,255,255,.07);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.market-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;}
+.market-card.high{border-color:rgba(0,229,160,.45);background:rgba(0,229,160,.06)}
+.market-card.medium{border-color:rgba(255,215,0,.4);background:rgba(255,215,0,.05)}
+.market-card.low{border-color:rgba(255,107,53,.35);background:rgba(255,107,53,.04)}
+.market-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px}.market-name{font-size:13px;font-weight:700}.market-score{font-family:'Bebas Neue',sans-serif;font-size:21px;color:var(--accent)}.market-meta{font-size:11px;color:var(--muted);line-height:1.45}.data-quality{display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(79,195,247,.07);border:1px solid rgba(79,195,247,.2);border-radius:10px;padding:9px 10px;margin-bottom:10px;font-size:11px}.data-pill{padding:3px 8px;border-radius:12px;font-weight:700;background:rgba(0,229,160,.12);color:var(--accent)}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--g3);border:1px solid var(--accent);color:var(--text);font-size:13px;padding:10px 20px;border-radius:24px;opacity:0;transition:all .3s;z-index:300;white-space:nowrap;max-width:90vw;text-align:center;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.fab{position:fixed;bottom:24px;right:20px;width:52px;height:52px;background:var(--accent);border:none;border-radius:50%;cursor:pointer;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,229,160,.4);z-index:200;}
+.bet-btn{display:inline-flex;align-items:center;padding:7px 16px;border-radius:20px;font-size:12px;font-weight:700;text-decoration:none;color:#000;background:#f7a600;white-space:nowrap;}
+/* ── CHAT ANALISES ── */
+.chat-bubble{max-width:88%;border-radius:18px;padding:12px 15px;font-size:14px;line-height:1.6;position:relative;}
+.chat-bot{background:var(--g3);border:1px solid var(--border);border-radius:18px 18px 18px 4px;color:var(--text);align-self:flex-start;}
+.chat-user{background:var(--accent2);color:#fff;border-radius:18px 18px 4px 18px;align-self:flex-end;}
+.chat-row{display:flex;align-items:flex-end;gap:8px;}
+.chat-row.bot{justify-content:flex-start;}
+.chat-row.user{justify-content:flex-end;}
+.chat-avatar{width:32px;height:32px;border-radius:50%;background:var(--g4);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.date-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.date-btn{padding:9px 16px;border-radius:22px;background:var(--accent2);color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:opacity .15s;}
+.date-btn:hover{opacity:.85;}
+.date-btn.selected{background:var(--g4);border:1px solid var(--accent2);color:var(--accent2);}
+.match-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.match-btn{padding:10px 16px;border-radius:22px;background:var(--accent2);color:#fff;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:opacity .15s;text-align:left;}
+.match-btn:hover{opacity:.85;}
+.match-btn.selected{background:var(--g4);border:1px solid var(--accent2);color:var(--accent2);}
+.analysis-card{background:var(--g3);border:1px solid rgba(0,229,160,.25);border-radius:14px;padding:14px;margin-top:8px;}
+.analysis-section{margin-bottom:14px;}
+.analysis-section:last-child{margin-bottom:0;}
+.analysis-section-title{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:flex;align-items:center;gap:5px;}
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.stat-row:last-child{border:none;}
+.stat-name{font-size:12px;color:var(--muted);}
+.stat-value{font-size:12px;font-weight:600;color:var(--text);}
+.stat-value.good{color:var(--accent);}
+.stat-value.warn{color:var(--gold);}
+.verdict-box{background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.3);border-radius:10px;padding:12px;margin-top:10px;}
+.verdict-score{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:3px;color:#fff;text-align:center;margin-bottom:6px;}
+.verdict-tips{display:flex;flex-direction:column;gap:4px;}
+.verdict-tip{font-size:12px;color:var(--text);display:flex;align-items:center;gap:6px;}
+.conf-pill{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:auto;}
+.conf-high{background:rgba(0,229,160,.2);color:var(--accent);}
+.conf-med{background:rgba(255,215,0,.2);color:var(--gold);}
+.typing-dots{display:flex;gap:4px;padding:4px 0;}
+.typing-dots span{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:bounce .9s infinite;}
+.typing-dots span:nth-child(2){animation-delay:.15s;}
+.typing-dots span:nth-child(3){animation-delay:.3s;}
+@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+.palpite-highlight{background:linear-gradient(135deg,rgba(0,229,160,.12),rgba(79,195,247,.08));border:1px solid rgba(0,229,160,.4);border-radius:12px;padding:12px;margin-top:8px;}
+.score-pred-box{background:linear-gradient(135deg,rgba(0,229,160,.12),rgba(79,195,247,.08));border:1px solid rgba(0,229,160,.35);border-radius:12px;padding:12px 14px;margin:10px 0 0;}
+.score-pred-label{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.score-pred-main{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:4px;color:#fff;text-align:center;margin-bottom:6px;}
+.palpite-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);}
+.palpite-row:last-child{border:none;}
+.palpite-name{font-size:12px;color:var(--text);}
+.palpite-conf{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;}
+.palpite-conf.high{background:rgba(0,229,160,.15);color:var(--accent);}
+.palpite-conf.med{background:rgba(255,215,0,.15);color:var(--gold);}
+.ai-box{background:rgba(79,195,247,.06);border:1px solid rgba(79,195,247,.2);border-radius:12px;padding:12px 14px;margin-top:10px;}
+.ai-loading{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);}
+.ai-text{font-size:13px;color:var(--text);line-height:1.7;}
+.ai-label{font-size:10px;font-weight:700;color:var(--accent3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:flex;align-items:center;gap:5px;}
+.world-cup-banner{background:linear-gradient(135deg,rgba(255,215,0,.12),rgba(255,107,53,.08));border:1px solid rgba(255,215,0,.4);border-radius:14px;padding:14px;margin-bottom:14px;}
+.wc-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.wc-title{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--gold);letter-spacing:1px;}
+.wc-chips{display:flex;gap:6px;flex-wrap:wrap;}
+.wc-chip{font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.3);color:var(--gold);cursor:pointer;transition:all .2s;}
+.wc-chip.active{background:rgba(255,215,0,.25);color:#fff;border-color:var(--gold);}
+.filter-league-row{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;}
+.filter-league-row::-webkit-scrollbar{display:none;}
+.fleague-btn{flex:0 0 auto;padding:5px 12px;font-size:12px;border-radius:20px;background:var(--card);border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:all .2s;}
+.fleague-btn.active{background:rgba(0,229,160,.12);border-color:rgba(0,229,160,.4);color:var(--accent);}
+</style>
+</head>
+<body>
+
+<!-- MODAL (acessível via Config) -->
+<div class="modal-overlay" id="apiModal" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-title">FOOT<span style="color:var(--accent2)">STATS</span> PRO</div>
+    <div class="modal-desc">
+      <strong style="color:var(--accent)">API gratuita — sem RapidAPI!</strong><br><br>
+      1. Acesse <a href="https://dashboard.api-football.com/register" target="_blank" style="color:var(--accent3)">dashboard.api-football.com/register</a><br>
+      2. Crie conta (sem cartao de credito)<br>
+      3. Copie a chave do painel e cole abaixo.<br><br>
+      Sem uma chave valida, o app nao consegue buscar dados novos. Quando houver dados parciais, a analise usa o que estiver disponivel e identifica a confianca.
+    </div>
+    <input class="modal-input" id="apiKeyInput" placeholder="Cole sua chave aqui..." type="password" autocomplete="off">
+    <div id="savedKeyHint" style="font-size:12px;color:var(--muted);margin-bottom:12px;"></div>
+    <div class="modal-row">
+      <button class="btn-primary" onclick="startWithKey()">Conectar API</button>
+    </div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="logo">FOOT<span>STATS</span> <span style="font-size:18px;color:var(--accent3)">PRO</span></div>
+  <div style="display:flex;gap:10px;align-items:center;">
+    <div style="font-size:12px;color:var(--muted)">v27</div>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="nav-btn active" onclick="showSection('analises',this)">&#129302; Analises</button>
+  <button class="nav-btn" onclick="showSection('mercados',this)">&#127919; Mercados</button>
+  <button class="nav-btn" onclick="showSection('config',this)">&#9881;&#65039; Config</button>
+</div>
+
+<div class="main">
+  <div id="alertContainer"></div>
+
+  <div class="section active" id="sec-analises">
+    <div id="chatWindow" style="display:flex;flex-direction:column;gap:12px;padding-bottom:8px;min-height:60vh;">
+      <!-- messages injected by JS -->
+    </div>
+  </div>
+
+  <div class="section" id="sec-mercados">
+    <div class="section-header" style="margin-top:4px"><div class="section-title">Mercados Recomendados</div><div class="section-badge">BASE ESTATÍSTICA</div></div>
+    <div id="marketsWindow">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;color:var(--muted);font-size:12px;line-height:1.5">
+        Selecione uma partida na aba <strong style="color:var(--text)">Análises</strong>. Os mercados serão calculados com os dados disponíveis, mesmo quando parte das estatísticas estiver faltando.
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="sec-config">
+    <div class="section-header" style="margin-top:4px"><div class="section-title">Configuracoes</div></div>
+    <div class="settings-card">
+      <div class="settings-item">
+        <div><div style="font-size:14px">Alertas de Gol</div><div style="font-size:12px;color:var(--muted)">Notificacao ao marcar</div></div>
+        <div class="toggle on" onclick="toggleSwitch(this)"></div>
+      </div>
+      <div class="settings-item">
+        <div><div style="font-size:14px">Alertas de Pressao</div><div style="font-size:12px;color:var(--muted)">Entrada acima de 65%</div></div>
+        <div class="toggle on" onclick="toggleSwitch(this)"></div>
+      </div>
+      <div class="settings-item">
+        <div><div style="font-size:14px">Auto-refresh 60s</div><div style="font-size:12px;color:var(--muted)">Ao vivo atualiza sozinho</div></div>
+        <div class="toggle on" onclick="toggleSwitch(this)"></div>
+      </div>
+    </div>
+    <div style="margin-top:16px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">Chave API</div>
+      <div style="font-size:12px;color:var(--accent);word-break:break-all;font-family:monospace" id="keyDisplay">-</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px" id="apiModeLabel">-</div>
+      <div style="margin-top:10px;background:rgba(255,255,255,.03);border-radius:8px;padding:10px 12px">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">Cache local (economiza cota)</div>
+        <div style="font-size:12px;color:var(--muted)" id="cacheStats">-</div>
+        <button onclick="limparCache()" style="margin-top:8px;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);padding:5px 14px;border-radius:12px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;">Limpar cache</button>
+      </div>
+      <button onclick="document.getElementById('apiModal').style.display='flex'" style="margin-top:12px;background:rgba(255,255,255,.07);border:1px solid var(--border);color:var(--muted);padding:8px 18px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">Trocar Chave</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ───────────────────────────────────────────────
+var API_KEY  = '';
+var BASE     = 'https://v3.football.api-sports.io';
+var SEASON   = (new Date().getMonth() < 6) ? (new Date().getFullYear() - 1) : new Date().getFullYear();
+// Com plano pago (Pro/Ultra/Mega) a api-football libera a temporada atual,
+// entao as estatisticas usam o ano corrente automaticamente.
+var STATS_SEASON = SEASON;
+var TODAY    = new Date().toISOString().split('T')[0];
+
+// Restaura a chave salva o mais cedo possível, isolado em try/catch para
+// nunca ser bloqueado por outro erro do app. Sem chave, o app nao busca nem
+// exibe nenhum dado — nao existe mais modo demo/simulado.
+try {
+  var _savedKeyEarly = getSavedKey();
+  if (_savedKeyEarly) API_KEY = _savedKeyEarly;
+} catch(e) {}
+
+function atualizarTelaChaveAPI() {
+  try {
+    var kd = document.getElementById('keyDisplay');
+    var am = document.getElementById('apiModeLabel');
+    if (!kd || !am) return;
+    if (API_KEY) {
+      kd.textContent = API_KEY.slice(0,6) + '**********' + API_KEY.slice(-4);
+      am.textContent = 'Modo: API Real';
+    } else {
+      kd.textContent = 'SEM CHAVE CONFIGURADA';
+      am.textContent = 'Configure sua chave para ver analises com dados reais.';
+    }
+  } catch(e) {}
+}
+atualizarTelaChaveAPI();
+
+var STATE = {
+  games: [], stats: {}, alerts: [],
+  selectedDate: TODAY,
+  allFixturesByDate: {},
+  firedAlerts: {}
+};
+
+// ── PERSISTENCIA (localStorage + cookie) ─────────────────
+function saveKey(key) {
+  try { localStorage.setItem('footstats_key', key); } catch(e) {}
+  try { document.cookie = 'footstats_key=' + encodeURIComponent(key) + ';max-age=31536000;path=/'; } catch(e) {}
+}
+
+function getSavedKey() {
+  try {
+    var k = localStorage.getItem('footstats_key');
+    if (k && k.trim()) return k.trim();
+  } catch(e) {}
+  try {
+    var m = document.cookie.match(/footstats_key=([^;]+)/);
+    if (m) return decodeURIComponent(m[1]).trim();
+  } catch(e) {}
+  return null;
+}
+
+// ── CACHE ────────────────────────────────────────────────
+var TTL = {
+  league: 6 * 3600000,
+  live:   60000,
+  date:   1800000,
+  stats:  12 * 3600000,
+  events: 120000
+};
+
+function cacheSet(key, data, ttl) {
+  try { localStorage.setItem('fsc_' + key, JSON.stringify({ data: data, exp: Date.now() + ttl })); } catch(e) {}
+}
+
+function cacheGet(key) {
+  try {
+    var raw = localStorage.getItem('fsc_' + key);
+    if (!raw) return null;
+    var obj = JSON.parse(raw);
+    if (Date.now() > obj.exp) { localStorage.removeItem('fsc_' + key); return null; }
+    return obj.data;
+  } catch(e) { return null; }
+}
+
+function limparCache() {
+  var keys = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && k.indexOf('fsc_') === 0) keys.push(k);
+  }
+  keys.forEach(function(k) { localStorage.removeItem(k); });
+  showToast('Cache limpo (' + keys.length + ' entradas)');
+  updateCacheStats();
+}
+
+function updateCacheStats() {
+  var el = document.getElementById('cacheStats');
+  if (!el) return;
+  var valid = 0, kb = 0;
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && k.indexOf('fsc_') === 0) {
+      try {
+        var raw = localStorage.getItem(k);
+        var obj = JSON.parse(raw);
+        if (Date.now() < obj.exp) valid++;
+        kb += raw.length;
+      } catch(e) {}
+    }
+  }
+  el.textContent = valid + ' entradas ativas · ' + (kb/1024).toFixed(1) + ' KB';
+}
+
+// ── API ──────────────────────────────────────────────────
+async function api(path, ttlKey) {
+  if (!API_KEY) return null;
+  var ttl = ttlKey ? TTL[ttlKey] : 300000;
+  var cached = cacheGet(path);
+  if (cached !== null) return cached;
+  var safeKey = API_KEY.replace(/[^\x20-\x7E]/g, '').trim();
+  try {
+    var r = await fetch(BASE + path, { headers: { 'x-apisports-key': safeKey } });
+    if (r.status === 401 || r.status === 403) {
+      showApiError('Chave invalida. Verifique em dashboard.api-football.com');
+      return null;
+    }
+    var d = await r.json();
+    if (d && d.errors) {
+      var errs = typeof d.errors === 'object' ? Object.values(d.errors) : d.errors;
+      if (Array.isArray(errs) ? errs.length : Object.keys(d.errors).length) {
+        var msg = JSON.stringify(d.errors).slice(0, 150);
+        showApiError('Erro API: ' + msg);
+        return null;
+      }
+    }
+    if (d && d.response !== undefined) {
+      cacheSet(path, d.response, ttl);
+      hideApiError();
+      return d.response;
+    }
+    return null;
+  } catch(e) {
+    showApiError('Erro de conexao: ' + e.message);
+    return null;
+  }
+}
+
+function showApiError(msg) {
+  var el = document.getElementById('apiErrBanner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'apiErrBanner';
+    el.style.cssText = 'background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#ff6b6b;display:flex;justify-content:space-between;align-items:center;gap:10px;';
+    document.getElementById('alertContainer').prepend(el);
+  }
+  el.innerHTML = '<span>' + msg + '</span><button onclick="document.getElementById(\'apiModal\').style.display=\'flex\'" style="background:rgba(255,68,68,.2);border:1px solid rgba(255,68,68,.4);color:#ff6b6b;padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;font-family:\'DM Sans\',sans-serif;white-space:nowrap;">Trocar Chave</button>';
+}
+
+function hideApiError() {
+  var el = document.getElementById('apiErrBanner');
+  if (el) el.remove();
+}
+
+// ── AUTH ─────────────────────────────────────────────────
+function startWithKey() {
+  var raw = document.getElementById('apiKeyInput').value || '';
+  var val = raw.replace(/[^\x20-\x7E]/g, '').trim();
+  if (!val && !API_KEY) { showToast('Cole sua chave de API para continuar'); return; }
+  if (val) { API_KEY = val; saveKey(val); }
+  document.getElementById('keyDisplay').textContent = API_KEY.slice(0,8) + '********************' + API_KEY.slice(-4);
+  document.getElementById('apiModeLabel').textContent = 'Modo: API Real';
+  document.getElementById('apiModal').style.display = 'none';
+  chatReset();
+}
+
+// ── TEAM LOGO ────────────────────────────────────────────
+function teamLogo(team, size) {
+  size = size || 38;
+  var colors = ['#00e5a0','#ff6b35','#4fc3f7','#ffd700','#ff4444','#a78bfa','#34d399'];
+  var c = colors[team.id % colors.length];
+  var initials = team.name.replace(/[^a-zA-Z ]/g,'').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+  if (team.logo) {
+    return '<div style="width:' + size + 'px;height:' + size + 'px;display:flex;align-items:center;justify-content:center;margin:0 auto 4px;">' +
+      '<img src="' + team.logo + '" style="width:' + size + 'px;height:' + size + 'px;object-fit:contain;" ' +
+      'onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\';" alt="">' +
+      '<div style="display:none;width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + c + '22;border:2px solid ' + c + '55;align-items:center;justify-content:center;font-size:' + Math.round(size*0.33) + 'px;font-weight:700;color:' + c + ';">' + initials + '</div>' +
+      '</div>';
+  }
+  return '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + c + '22;border:2px solid ' + c + '55;display:flex;align-items:center;justify-content:center;font-size:' + Math.round(size*0.33) + 'px;font-weight:700;color:' + c + ';margin:0 auto 4px;">' + initials + '</div>';
+}
+
+// Retorna estatisticas derivadas SOMENTE quando ha dado real da API para
+// ambos os times. Nunca preenche media de gols, forma ou escanteios com
+// valor padrao/aleatorio — se faltar o dado real, o campo correspondente
+// fica null e a interface deve exibir "sem dado" em vez de um numero falso.
+function getStats(hid, aid) {
+  var h = STATE.stats[hid] || {};
+  var a = STATE.stats[aid] || {};
+  function avg(obj, group, metric, side){
+    try {
+      var v = obj[group] && obj[group][metric] && obj[group][metric].average && obj[group][metric].average[side];
+      return v == null ? null : parseFloat(v);
+    } catch(e){ return null; }
+  }
+  var hGF = avg(h,'goals','for','home');
+  var aGF = avg(a,'goals','for','away');
+  var hGA = avg(h,'goals','against','home');
+  var aGA = avg(a,'goals','against','away');
+  var hForm = h.form ? h.form.slice(-5).split('') : null;
+  var aForm = a.form ? a.form.slice(-5).split('') : null;
+  var total = hGF != null && aGF != null ? (hGF + aGF) : null;
+  var btts = total != null ? Math.round(Math.min(95, Math.max(15, ((hGF * aGF) / Math.max(1,total)) * 70))) : null;
+  var o15 = total != null ? Math.round(Math.min(95, Math.max(35, 100 - Math.exp(-total) * (1 + total)))) : null;
+  var o25 = total != null ? Math.round(Math.min(90, Math.max(15, 100 - Math.exp(-total) * (1 + total + (total*total/2))))) : null;
+  return {
+    hGF: hGF, aGF: aGF, hGA: hGA, aGA: aGA, btts: btts, o15: o15, o25: o25,
+    corners: null, htGoals: total != null ? (total*0.44).toFixed(1) : null,
+    hForm: hForm, aForm: aForm
+  };
+}
+
+// ── UTILS ────────────────────────────────────────────────
+function showSection(name, btn) {
+  document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('sec-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name==='analises') initChat();
+  if (name==='mercados') renderMarketsPanel();
+  if (name==='config') updateCacheStats();
+}
+
+function toggleSwitch(el) { el.classList.toggle('on'); showToast(el.classList.contains('on')?'Ativado!':'Desativado'); }
+function showToast(msg) { var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(function(){ t.classList.remove('show'); }, 2500); }
+
+// ── ANALISES CHAT ENGINE ─────────────────────────────────
+var CHAT_STATE = { step: 'date', selectedDate: null, selectedMatch: null };
+var LAST_ANALYSIS = null;
+
+// Top leagues — filtro obrigatório
+var CHAT_LEAGUES = [
+  {id:39,  name:'Premier League',       emoji:'🏴󠁧󠁢󠁥󠁮󠁧󠁿'},
+  {id:140, name:'La Liga',              emoji:'🇪🇸'},
+  {id:135, name:'Serie A',              emoji:'🇮🇹'},
+  {id:71,  name:'Brasileirao Serie A',  emoji:'🇧🇷'},
+  {id:72,  name:'Brasileirao Serie B',  emoji:'🇧🇷'},
+  {id:73,  name:'Copa do Brasil',       emoji:'🏆'},
+  {id:2,   name:'Champions League',     emoji:'⭐'},
+  {id:13,  name:'Libertadores',         emoji:'🌎'},
+  {id:11,  name:'Sul-Americana',        emoji:'🌎'},
+  {id:1,   name:'Copa do Mundo',        emoji:'🏆'},
+  {id:15,  name:'Mundial de Clubes',    emoji:'🌍'},
+];
+
+var ALLOWED_LEAGUE_IDS = CHAT_LEAGUES.map(function(l){ return l.id; });
+
+// Match data keyed by YYYY-MM-DD — populated from API or demo
+var CHAT_MATCHES_CACHE = {};
+
+function chatBot(html, withAvatar) {
+  var av = withAvatar !== false ? '<div class="chat-avatar">🤖</div>' : '<div style="width:32px;flex-shrink:0"></div>';
+  return '<div class="chat-row bot">' + av + '<div class="chat-bubble chat-bot">' + html + '</div></div>';
+}
+function chatUser(text) {
+  return '<div class="chat-row user"><div class="chat-bubble chat-user">' + text + '</div></div>';
+}
+function chatTyping() {
+  return '<div class="chat-row bot" id="chatTyping"><div class="chat-avatar">🤖</div><div class="chat-bubble chat-bot"><div class="typing-dots"><span></span><span></span><span></span></div></div></div>';
+}
+
+function appendChat(html) {
+  var w = document.getElementById('chatWindow');
+  var div = document.createElement('div');
+  div.innerHTML = html;
+  Array.from(div.childNodes).forEach(function(n){ w.appendChild(n); });
+  w.scrollTop = w.scrollHeight;
+}
+function removeTyping() {
+  var el = document.getElementById('chatTyping');
+  if (el) el.remove();
+}
+
+function buildDateButtons() {
+  var today = new Date();
+  var btns = '';
+  // Apenas hoje e amanhã
+  for (var i = 0; i <= 1; i++) {
+    var d = new Date(today); d.setDate(today.getDate() + i);
+    var iso = d.toISOString().split('T')[0];
+    var lbl = i === 0 ? '📅 Hoje (' + d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) + ')' : '📅 Amanhã (' + d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) + ')';
+    btns += '<button class="date-btn" onclick="chatPickDate(\'' + iso + '\',this)">' + lbl + '</button>';
+  }
+  return '<div class="date-btns">' + btns + '</div>';
+}
+
+function initChat() {
+  var w = document.getElementById('chatWindow');
+  if (w.children.length > 0) return; // already init
+  appendChat(chatBot('Ola! 👋 Vamos as analises.<br><strong>Qual data deseja consultar?</strong>' + buildDateButtons(), true));
+}
+
+async function chatPickDate(dateStr, el) {
+  if (CHAT_STATE.step !== 'date') return;
+  CHAT_STATE.step = 'loading_matches';
+  CHAT_STATE.selectedDate = dateStr;
+  document.querySelectorAll('.date-btn').forEach(function(b){ b.disabled = true; b.classList.remove('selected'); });
+  el.classList.add('selected');
+
+  var fmt = new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+  appendChat(chatUser('📅 ' + fmt));
+  appendChat(chatTyping());
+
+  await new Promise(function(r){ setTimeout(r, 900); });
+  removeTyping();
+
+  if (!API_KEY) {
+    CHAT_STATE.step = 'date';
+    appendChat(chatBot('Ainda nao ha uma chave de API configurada, entao nao tenho jogos reais para mostrar — nao vou inventar partidas ou numeros. ' +
+      '<div style="margin-top:8px"><button class="match-btn" onclick="document.getElementById(\'apiModal\').style.display=\'flex\'">🔑 Configurar chave de API</button></div>', true));
+    document.querySelectorAll('.date-btn').forEach(function(b){ b.disabled = false; });
+    return;
+  }
+
+  var raw = await api('/fixtures?date=' + dateStr + '&timezone=America/Sao_Paulo', 'date');
+  if (raw === null) {
+    CHAT_STATE.step = 'date';
+    appendChat(chatBot('Nao consegui buscar os jogos reais agora (falha na API). Nao vou mostrar dados inventados no lugar. Tente novamente em instantes.' +
+      '<div style="margin-top:8px"><button class="match-btn" onclick="chatReset()">🔄 Tentar de novo</button></div>', true));
+    return;
+  }
+
+  var filtered = raw.filter(function(f){
+    return ALLOWED_LEAGUE_IDS.indexOf(f.league.id) >= 0;
+  });
+
+  // Busca estatisticas reais de cada time (casa/fora) antes de montar os cards.
+  for (var mi = 0; mi < filtered.length; mi++) {
+    var fx = filtered[mi];
+    var hid = fx.teams.home.id, aid = fx.teams.away.id, lid = fx.league.id;
+    if (!STATE.stats[hid]) { var rh = await api('/teams/statistics?league=' + lid + '&season=' + STATS_SEASON + '&team=' + hid, 'stats'); if (rh) STATE.stats[hid] = rh; }
+    if (!STATE.stats[aid]) { var ra = await api('/teams/statistics?league=' + lid + '&season=' + STATS_SEASON + '&team=' + aid, 'stats'); if (ra) STATE.stats[aid] = ra; }
+  }
+
+  // Cada campo abaixo so recebe valor quando existe dado real (getStats ja
+  // retorna null quando falta media de gols/forma). Nunca preenchemos com
+  // Math.random() nem com constantes fixas — se nao houver dado, fica null
+  // e a interface mostra "sem dado" em vez de um numero inventado.
+  var matches = filtered.map(function(f){
+    var derived = getStats(f.teams.home.id, f.teams.away.id);
+    return {
+      id: f.fixture.id,
+      home: f.teams.home.name,
+      away: f.teams.away.name,
+      hId: f.teams.home.id, aId: f.teams.away.id,
+      hLogo: f.teams.home.logo || '', aLogo: f.teams.away.logo || '',
+      league: f.league.name,
+      leagueId: f.league.id,
+      time: new Date(f.fixture.date).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),
+      hFlag: '', aFlag: '',
+      group: f.league.round || '',
+      hGF: derived && derived.hGF != null ? derived.hGF : null,
+      aGF: derived && derived.aGF != null ? derived.aGF : null,
+      hGA: derived && derived.hGA != null ? derived.hGA : null,
+      aGA: derived && derived.aGA != null ? derived.aGA : null,
+      corners: null,
+      btts: derived && derived.btts != null ? derived.btts : null,
+      o15: derived && derived.o15 != null ? derived.o15 : null,
+      o25: derived && derived.o25 != null ? derived.o25 : null,
+      hForm: derived ? derived.hForm : null,
+      aForm: derived ? derived.aForm : null,
+      _raw: f
+    };
+  });
+
+  if (!matches.length) {
+    CHAT_STATE.step = 'date';
+    appendChat(chatBot('Nao encontrei jogos reais das ligas acompanhadas para essa data.' +
+      '<div style="margin-top:8px"><button class="match-btn" onclick="chatReset()">🔄 Escolher outra data</button></div>', true));
+    document.querySelectorAll('.date-btn').forEach(function(b){ b.disabled = false; });
+    return;
+  }
+
+  CHAT_MATCHES_CACHE[dateStr] = matches;
+  CHAT_STATE.step = 'match';
+
+  // Agrupar por campeonato
+  var leagueGroups = {};
+  matches.forEach(function(m){
+    if (!leagueGroups[m.league]) leagueGroups[m.league] = [];
+    leagueGroups[m.league].push(m);
+  });
+
+  var leagueOrder = CHAT_LEAGUES.map(function(l){ return l.name; });
+  var sortedLeagues = Object.keys(leagueGroups).sort(function(a, b){
+    var ia = leagueOrder.indexOf(a), ib = leagueOrder.indexOf(b);
+    if (ia < 0) ia = 999; if (ib < 0) ib = 999;
+    return ia - ib;
+  });
+
+  var groupedHtml = sortedLeagues.map(function(leagueName){
+    var lgMatches = leagueGroups[leagueName];
+    var lgEmoji = '';
+    CHAT_LEAGUES.forEach(function(l){ if (l.name === leagueName || leagueName.indexOf(l.name) >= 0) lgEmoji = l.emoji; });
+    var btns = lgMatches.map(function(m){
+      return '<button class="match-btn" onclick="chatPickMatch(\'' + m.id + '\',this)">' +
+        (m.hFlag ? m.hFlag + ' ' : '') + m.home + ' vs ' + m.away + (m.aFlag ? ' ' + m.aFlag : '') +
+        ' <span style="font-size:10px;color:var(--muted)">(' + m.time + ')</span></button>';
+    }).join('');
+    return '<div style="margin-bottom:10px">' +
+      '<div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">' + lgEmoji + ' ' + leagueName + '</div>' +
+      '<div class="match-btns">' + btns + '</div></div>';
+  }).join('');
+
+  appendChat(chatBot('<strong>Selecione a partida por campeonato:</strong><br><span style="font-size:12px;color:var(--muted)">' + matches.length + ' jogos nos campeonatos selecionados</span><div style="margin-top:10px">' + groupedHtml + '</div>', true));
+}
+
+// ── DADOS REAIS (jogos recentes + artilheiros/assistencias) ──
+var TOPSCORERS_CACHE = {};
+var TOPASSISTS_CACHE = {};
+
+function diasAtras(dateStr) {
+  var d = Math.round((Date.now() - new Date(dateStr).getTime()) / 86400000);
+  if (d <= 0) return 'hoje';
+  if (d === 1) return 'ha 1 dia';
+  return 'ha ' + d + ' dias';
+}
+
+function fixturesParaHistorico(fixtures, limit) {
+  return (fixtures || [])
+    .filter(function(f){ return f.fixture.status.short === 'FT'; })
+    .sort(function(a,b){ return new Date(b.fixture.date) - new Date(a.fixture.date); })
+    .slice(0, limit)
+    .map(function(f){
+      var gh = f.goals.home||0, ga = f.goals.away||0, total = gh+ga;
+      var obsParts = [];
+      if (total > 2) obsParts.push('Over 2.5');
+      else if (total > 1) obsParts.push('Over 1.5');
+      else obsParts.push('Under 1.5');
+      if (gh > 0 && ga > 0) obsParts.push('BTTS');
+      return {
+        jogo: f.teams.home.name + ' x ' + f.teams.away.name,
+        resultado: gh + '-' + ga,
+        data: diasAtras(f.fixture.date),
+        obs: obsParts.join(', ')
+      };
+    });
+}
+
+function findPlayerForTeam(list, teamId) {
+  if (!list) return null;
+  for (var i = 0; i < list.length; i++) {
+    var st = list[i].statistics && list[i].statistics[0];
+    if (st && st.team && st.team.id === teamId) {
+      var val = (list[i].statistics[0].goals && list[i].statistics[0].goals.total) || (list[i].statistics[0].goals && list[i].statistics[0].goals.assists) || 0;
+      return { nome: list[i].player.name, gols: val };
+    }
+  }
+  return null;
+}
+
+async function getTopScorers(leagueId) {
+  if (TOPSCORERS_CACHE[leagueId]) return TOPSCORERS_CACHE[leagueId];
+  var r = await api('/players/topscorers?league=' + leagueId + '&season=' + STATS_SEASON, 'league');
+  TOPSCORERS_CACHE[leagueId] = r || [];
+  return TOPSCORERS_CACHE[leagueId];
+}
+
+async function getTopAssists(leagueId) {
+  if (TOPASSISTS_CACHE[leagueId]) return TOPASSISTS_CACHE[leagueId];
+  var r = await api('/players/topassists?league=' + leagueId + '&season=' + STATS_SEASON, 'league');
+  TOPASSISTS_CACHE[leagueId] = r || [];
+  return TOPASSISTS_CACHE[leagueId];
+}
+
+function toNum(v){
+  if (v === null || v === undefined || v === '' || v === 'null') return null;
+  var n = parseFloat(String(v).replace(',','.'));
+  return isNaN(n) ? null : n;
+}
+function avgNums(arr){
+  var a=(arr||[]).filter(function(v){return v!=null && !isNaN(v);});
+  return a.length ? a.reduce(function(x,y){return x+y;},0)/a.length : null;
+}
+function statTypeValue(stats, names){
+  if (!stats) return null;
+  var arr=Array.isArray(names)?names:[names];
+  for(var i=0;i<stats.length;i++){
+    var t=String(stats[i].type||'').toLowerCase();
+    for(var j=0;j<arr.length;j++){
+      if(t===String(arr[j]).toLowerCase()) return toNum(stats[i].value);
+    }
+  }
+  return null;
+}
+function fixtureStatsMap(resp){
+  var out={};
+  (resp||[]).forEach(function(item){
+    var id=item.team&&item.team.id;
+    if(id==null) return;
+    var st=item.statistics||[];
+    out[id]={
+      shots:statTypeValue(st,['Total Shots','Shots Total']),
+      on:statTypeValue(st,['Shots on Goal','Shots on Target']),
+      off:statTypeValue(st,['Shots off Goal','Shots off Target']),
+      corners:statTypeValue(st,['Corner Kicks','Corners']),
+      fouls:statTypeValue(st,['Fouls']),
+      yellow:statTypeValue(st,['Yellow Cards']),
+      red:statTypeValue(st,['Red Cards'])
+    };
+  });
+  return out;
+}
+function teamRecentSummary(fixtures, teamId){
+  var out={games:0, gf:[], ga:[], over15:0, over25:0, btts:0, wins:0, draws:0, losses:0};
+  (fixtures||[]).filter(function(f){return f.fixture && f.fixture.status && ['FT','AET','PEN'].indexOf(f.fixture.status.short)>=0;}).forEach(function(f){
+    var h=f.teams.home.id===teamId, gh=toNum(f.goals.home), ga=toNum(f.goals.away);
+    if(gh==null||ga==null) return;
+    var gf=h?gh:ga, against=h?ga:gh, total=gh+ga;
+    out.games++; out.gf.push(gf); out.ga.push(against);
+    if(total>=2) out.over15++; if(total>=3) out.over25++; if(gh>0&&ga>0) out.btts++;
+    if(gf>against) out.wins++; else if(gf===against) out.draws++; else out.losses++;
+  });
+  out.gfAvg=avgNums(out.gf); out.gaAvg=avgNums(out.ga);
+  out.over15Pct=out.games?Math.round(out.over15/out.games*100):null;
+  out.over25Pct=out.games?Math.round(out.over25/out.games*100):null;
+  out.bttsPct=out.games?Math.round(out.btts/out.games*100):null;
+  return out;
+}
+function normalizePlayerRows(resp, teamId){
+  var rows=[];
+  (resp||[]).forEach(function(item){
+    var p=item.player||{};
+    var stats=item.statistics||[];
+    stats.forEach(function(st){
+      if(st.team && teamId && st.team.id!==teamId) return;
+      var games=st.games||{}, shots=st.shots||{}, goals=st.goals||{};
+      var apps=toNum(games.appearences)||toNum(games.appearances)||0;
+      var totalShots=toNum(shots.total), on=toNum(shots.on), totalGoals=toNum(goals.total), assists=toNum(goals.assists);
+      if((apps||totalShots!=null||totalGoals!=null) && p.name){
+        rows.push({id:p.id,nome:p.name,jogos:apps,total:totalShots,noGol:on,gols:totalGoals||0,assistencias:assists||0,mediaChutes:apps?totalShots/apps:null,mediaNoGol:apps?on/apps:null});
+      }
+    });
+  });
+  var by={}; rows.forEach(function(r){by[r.id]=r;});
+  return Object.keys(by).map(function(k){return by[k];}).sort(function(a,b){return (b.mediaChutes||0)-(a.mediaChutes||0);});
+}
+async function getTeamPlayers(teamId, leagueId){
+  if(!teamId) return [];
+  var key='players_'+teamId+'_'+STATS_SEASON+'_'+(leagueId||0);
+  var cached=cacheGet(key); if(cached!==null) return cached;
+  var r=await api('/players?team='+teamId+'&season='+STATS_SEASON+(leagueId?'&league='+leagueId:''),'league');
+  var rows=normalizePlayerRows(r,teamId);
+  cacheSet(key,rows,TTL.league);
+  return rows;
+}
+async function getStandingsPositions(leagueId, teamIds){
+  if(!leagueId) return {};
+  var key='standings_'+leagueId+'_'+STATS_SEASON;
+  var cached=cacheGet(key);
+  if(cached!==null) return cached;
+  var data=await api('/standings?league='+leagueId+'&season='+STATS_SEASON,'league');
+  var map={};
+  try{
+    var groups=data&&data[0]&&data[0].league&&data[0].league.standings?data[0].league.standings:[];
+    groups.forEach(function(group){(group||[]).forEach(function(row){if(row.team) map[row.team.id]=row.rank;});});
+  }catch(e){}
+  cacheSet(key,map,TTL.league);
+  return map;
+}
+
+async function buscarDadosReais(match) {
+  try {
+    var homeFixtures = match.hId ? await api('/fixtures?team=' + match.hId + '&last=5', 'league') : null;
+    var awayFixtures = match.aId ? await api('/fixtures?team=' + match.aId + '&last=5', 'league') : null;
+    var homeRecent=teamRecentSummary(homeFixtures,match.hId), awayRecent=teamRecentSummary(awayFixtures,match.aId);
+    var historicoCasa=fixturesParaHistorico(homeFixtures,5), historicoFora=fixturesParaHistorico(awayFixtures,5);
+    var historico=historicoCasa.concat(historicoFora).sort(function(a,b){return String(a.data).localeCompare(String(b.data));}).slice(0,8);
+
+    var metrics={home:{},away:{}};
+    var ids=[];
+    (homeFixtures||[]).filter(function(f){return f.fixture&&f.fixture.status&&['FT','AET','PEN'].indexOf(f.fixture.status.short)>=0;}).slice(0,3).forEach(function(f){ids.push(f.fixture.id);});
+    (awayFixtures||[]).filter(function(f){return f.fixture&&f.fixture.status&&['FT','AET','PEN'].indexOf(f.fixture.status.short)>=0;}).slice(0,3).forEach(function(f){ids.push(f.fixture.id);});
+    ids=[...new Set(ids)].slice(0,6);
+    for(var si=0;si<ids.length;si++){
+      var sr=await api('/fixtures/statistics?fixture='+ids[si],'events');
+      var sm=fixtureStatsMap(sr);
+      [match.hId,match.aId].forEach(function(tid){
+        if(!tid||!sm[tid]) return;
+        var target=tid===match.hId?metrics.home:metrics.away;
+        ['shots','on','off','corners','fouls','yellow','red'].forEach(function(k){if(sm[tid][k]!=null){if(!target[k])target[k]=[];target[k].push(sm[tid][k]);}});
+      });
+    }
+    Object.keys(metrics).forEach(function(side){Object.keys(metrics[side]).forEach(function(k){metrics[side][k+'_media']=avgNums(metrics[side][k]);});});
+
+    var topScorers = match.leagueId ? await getTopScorers(match.leagueId) : null;
+    var topAssists = match.leagueId ? await getTopAssists(match.leagueId) : null;
+    var jogadores = {
+      hScorer: findPlayerForTeam(topScorers, match.hId),
+      aScorer: findPlayerForTeam(topScorers, match.aId),
+      hAssist: findPlayerForTeam(topAssists, match.hId),
+      aAssist: findPlayerForTeam(topAssists, match.aId),
+      listaCasa: await getTeamPlayers(match.hId,match.leagueId),
+      listaFora: await getTeamPlayers(match.aId,match.leagueId)
+    };
+    var posicoes=await getStandingsPositions(match.leagueId,[match.hId,match.aId]);
+    return {historico:historico,historicoCasa:historicoCasa,historicoFora:historicoFora,jogadores:jogadores,metricas:metrics,recentes:{casa:homeRecent,fora:awayRecent},posicoes:posicoes};
+  } catch (e) {
+    return {historico:[],historicoCasa:[],historicoFora:[],jogadores:{listaCasa:[],listaFora:[]},metricas:{home:{},away:{}},recentes:{casa:teamRecentSummary([],match.hId),fora:teamRecentSummary([],match.aId)},posicoes:{},erro:e&&e.message?e.message:''};
+  }
+}
+
+function poissonP(k,lambda){return Math.exp(-lambda)*Math.pow(lambda,k)/factorial(k);}
+function factorial(n){var r=1;for(var i=2;i<=n;i++)r*=i;return r;}
+function poissonWinProbs(lh,la){
+  var h=0,d=0,a=0;
+  for(var i=0;i<=8;i++){for(var j=0;j<=8;j++){var p=poissonP(i,lh)*poissonP(j,la);if(i>j)h+=p;else if(i===j)d+=p;else a+=p;}}
+  var sum=h+d+a||1; return {home:h/sum,draw:d/sum,away:a/sum};
+}
+function poissonTotals(lh,la){
+  var total=lh+la;
+  var p0=Math.exp(-total), p1=p0*total, p2=p1*total/2;
+  var o15=1-(p0+p1), o25=1-(p0+p1+p2);
+  var btts=1-Math.exp(-lh)-Math.exp(-la)+Math.exp(-(lh+la));
+  return {o15:o15,o25:o25,btts:btts,total:total};
+}
+function teamStrengthText(side, m){
+  if(!m) return 'Sem dados suficientes para descrever o perfil.';
+  var s=[];
+  if(m.shots_media!=null) s.push('média de '+m.shots_media.toFixed(1)+' finalizações');
+  if(m.on_media!=null) s.push(m.on_media.toFixed(1)+' no alvo/jogo');
+  if(m.corners_media!=null) s.push(m.corners_media.toFixed(1)+' escanteios/jogo');
+  return s.length?s.join(' e '):'perfil estatístico parcial';
+}
+function buildMarkets(match,a){
+  var out=[];
+  function add(nome,score,base,exp,tag){if(score==null)return;out.push({nome:nome,score:Math.round(score),base:base,exp:exp,tag:tag||''});}
+  var g=a.gols||{};
+  if(g.o15_pct!=null) add('Over 1.5 gols',g.o15_pct,'Probabilidade estimada pelos gols esperados + histórico recente.',g.o15_pct>=70?'Boa base estatística':'Base moderada','GOLS');
+  if(g.o25_pct!=null) add('Over 2.5 gols',g.o25_pct,'Estimativa por distribuição de gols; usar com mais cautela que Over 1.5.',g.o25_pct>=60?'Boa base':'Base moderada','GOLS');
+  if(g.btts_pct!=null) add('Ambas marcam',g.btts_pct,'Combina produção ofensiva e frequência recente de ambos marcarem.',g.btts_pct>=60?'Boa base':'Base moderada','GOLS');
+  var fin=a.finalizacoes||{};
+  if(fin.casa_media!=null && fin.casa_media>=9) add(match.home+' — Over 1.5 finalizações',Math.min(92,70+fin.casa_media*1.5),'Média histórica de finalizações da equipe.', 'Volume ofensivo relevante','FINALIZAÇÕES');
+  if(fin.fora_media!=null && fin.fora_media>=9) add(match.away+' — Over 1.5 finalizações',Math.min(92,70+fin.fora_media*1.5),'Média histórica de finalizações da equipe.', 'Volume ofensivo relevante','FINALIZAÇÕES');
+  var players=(a.mercados_jogadores||[]).slice(0,4);
+  players.forEach(function(p){add(p.nome+' — Over 1.5 finalizações',p.conf,'Média de '+p.media.toFixed(2)+' finalizações por jogo, com '+p.jogos+' jogos na amostra.',p.media>=2?'Volume alto':'Volume moderado','JOGADOR');});
+  var esc=a.escanteios||{}; if(esc.over85_pct!=null) add('Over 8.5 escanteios',esc.over85_pct,'Frequência calculada a partir dos jogos históricos com estatísticas disponíveis.',esc.over85_pct>=55?'Boa base':'Base moderada','ESCANTEIOS');
+  var car=a.cartoes||{}; if(car.media_jogo!=null) add('Over 3.5 cartões',Math.min(88,Math.max(30,(car.media_jogo/5)*100)),'Média histórica de cartões das partidas analisadas.',car.media_jogo>=4?'Tendência alta':'Tendência moderada','CARTÕES');
+  out.sort(function(x,y){return y.score-x.score;}); return out.slice(0,6);
+}
+function localAnalyzeMatch(match,realData){
+  realData=realData||{};
+  var d=match||{}, rec=realData.recentes||{}, hm=realData.metricas&&realData.metricas.home||{}, am=realData.metricas&&realData.metricas.away||{};
+  var hgf=toNum(d.hGF), agf=toNum(d.aGF), hga=toNum(d.hGA), aga=toNum(d.aGA);
+  if(hgf==null) hgf=rec.casa&&rec.casa.gfAvg; if(agf==null) agf=rec.fora&&rec.fora.gfAvg;
+  if(hga==null) hga=rec.casa&&rec.casa.gaAvg; if(aga==null) aga=rec.fora&&rec.fora.gaAvg;
+  if(hgf==null && agf==null){
+    var hc=rec.casa&&rec.casa.gfAvg, ac=rec.fora&&rec.fora.gfAvg; if(hc!=null)hgf=hc;if(ac!=null)agf=ac;
+  }
+  var lh=(hgf!=null&&aga!=null)?(hgf*0.62+aga*0.38):(hgf!=null?hgf:(aga!=null?aga:null));
+  var la=(agf!=null&&hga!=null)?(agf*0.62+hga*0.38):(agf!=null?agf:(hga!=null?hga:null));
+  var probs=null, totals=null;
+  if(lh!=null || la!=null){
+    if(lh==null) lh=Math.max(.2,Math.min(3.4,la*.85));
+    if(la==null) la=Math.max(.2,Math.min(3.2,lh*.85));
+    lh=Math.min(3.4,Math.max(.2,lh));la=Math.min(3.2,Math.max(.2,la));
+    probs=poissonWinProbs(lh,la); totals=poissonTotals(lh,la);
+  }
+  var hist=(realData.historico||[]).slice();
+  var pad=[];
+  var rc=rec.casa||{}, ra=rec.fora||{};
+  if(rc.games) pad.push(match.home+' teve '+rc.wins+' vitória(s) em '+rc.games+' jogo(s) recentes analisados.');
+  if(ra.games) pad.push(match.away+' teve '+ra.wins+' vitória(s) em '+ra.games+' jogo(s) recentes analisados.');
+  if(rc.over15Pct!=null) pad.push(match.home+' teve Over 1.5 em '+rc.over15Pct+'% dos jogos recentes analisados.');
+  if(ra.over15Pct!=null) pad.push(match.away+' teve Over 1.5 em '+ra.over15Pct+'% dos jogos recentes analisados.');
+  if(rc.bttsPct!=null || ra.bttsPct!=null) pad.push('A frequência recente de ambas marcarem foi '+(rc.bttsPct!=null?rc.bttsPct:'N/D')+'% para '+match.home+' e '+(ra.bttsPct!=null?ra.bttsPct:'N/D')+'% para '+match.away+'.');
+  var playerRows=[];(realData.jogadores&&realData.jogadores.listaCasa||[]).concat((realData.jogadores&&realData.jogadores.listaFora)||[]).forEach(function(p){if(p.mediaChutes!=null&&p.mediaChutes>=1.5&&p.jogos>=3)playerRows.push({nome:p.nome,media:p.mediaChutes,jogos:p.jogos,conf:Math.min(90,Math.round(55+p.mediaChutes*12))});});
+  playerRows.sort(function(a,b){return b.media-a.media;});
+  var shotsH=hm.shots_media, shotsA=am.shots_media, onH=hm.on_media, onA=am.on_media;
+  var faltas={casa_cometidas:hm.fouls_media,fora_cometidas:am.fouls_media,casa_sofridas:null,fora_sofridas:null};
+  var escH=hm.corners_media, escA=am.corners_media, escTotal=(escH!=null&&escA!=null)?escH+escA:null;
+  var yellowH=hm.yellow_media, yellowA=am.yellow_media, redH=hm.red_media, redA=am.red_media;
+  var cardVals=[yellowH,yellowA,redH,redA].filter(function(x){return x!=null;});
+  var cardAvg=cardVals.length?cardVals.reduce(function(x,y){return x+y;},0):null;
+  var qualityParts=0,qualityMax=9;
+  [hgf,agf,hga,aga,shotsH,shotsA,escH,escA,cardAvg].forEach(function(x){if(x!=null)qualityParts++;});
+  var quality=Math.round(qualityParts/qualityMax*100); if(hist.length)quality=Math.min(100,quality+10); if(playerRows.length)quality=Math.min(100,quality+10);
+  var nivel=quality>=75?'ALTA':quality>=50?'BOA':quality>=30?'PARCIAL':'PRELIMINAR';
+  var contexto='Análise gerada com os dados que estavam disponíveis para esta partida. Campos ausentes não bloqueiam a análise e aparecem como N/D.';
+  var forcaH=teamStrengthText('home',hm),forcaA=teamStrengthText('away',am);
+  var a={
+    contexto:contexto,resumo_casa:{nome:match.home,forca:forcaH,fraqueza:(rec.casa&&rec.casa.gaAvg!=null?'sofre em média '+rec.casa.gaAvg.toFixed(1)+' gol(s) por jogo':'dados defensivos parciais'),estilo:'produção ofensiva baseada no volume estatístico disponível',posicao_tabela:realData.posicoes&&realData.posicoes[match.hId]?realData.posicoes[match.hId]+'º lugar':null,artilheiro:null,destaque:null},
+    resumo_fora:{nome:match.away,forca:forcaA,fraqueza:(rec.fora&&rec.fora.gaAvg!=null?'sofre em média '+rec.fora.gaAvg.toFixed(1)+' gol(s) por jogo':'dados defensivos parciais'),estilo:'produção ofensiva baseada no volume estatístico disponível',posicao_tabela:realData.posicoes&&realData.posicoes[match.aId]?realData.posicoes[match.aId]+'º lugar':null,artilheiro:null,destaque:null},
+    historico_recente:hist,padroes:pad.slice(0,5),
+    gols:{media_esperada:totals?totals.total.toFixed(2):null,o15_pct:totals?Math.round(totals.o15*100):null,o25_pct:totals?Math.round(totals.o25*100):null,btts_pct:totals?Math.round(totals.btts*100):null,analise:totals?'A projeção de gols combina médias ofensivas/defensivas disponíveis e distribuição de Poisson. É uma estimativa estatística, não garantia.':'Não há média de gols confiável disponível; a análise continua com histórico, finalizações e outros dados que existirem.'},
+    finalizacoes:{casa_media:shotsH!=null?shotsH.toFixed(2):null,casa_no_gol:onH!=null?onH.toFixed(2):null,casa_fora_gol:hm.off_media!=null?hm.off_media.toFixed(2):null,fora_media:shotsA!=null?shotsA.toFixed(2):null,fora_no_gol:onA!=null?onA.toFixed(2):null,fora_fora_gol:am.off_media!=null?am.off_media.toFixed(2):null,analise:(shotsH!=null||shotsA!=null)?'Médias calculadas a partir das estatísticas de finalizações dos jogos recentes encontrados.':'Não foram encontradas estatísticas históricas de finalizações; a análise de gols não é bloqueada.'},
+    faltas:faltas,escanteios:{media:escTotal!=null?escTotal.toFixed(2):null,casa_media:escH!=null?escH.toFixed(2):null,fora_media:escA!=null?escA.toFixed(2):null,over85_pct:null,over105_pct:null,analise:'Escanteios são exibidos apenas quando a API fornece estatísticas históricas.'},
+    cartoes:{media_jogo:cardAvg!=null?cardAvg.toFixed(2):null,analise:cardAvg!=null?'Média de cartões encontrada nos jogos históricos com estatísticas disponíveis.':'Sem estatísticas de cartões suficientes na API para esta amostra.'},
+    vitorias:{prob_casa:probs?Math.round(probs.home*100):null,prob_empate:probs?Math.round(probs.draw*100):null,prob_fora:probs?Math.round(probs.away*100):null,analise:probs?'Probabilidades calculadas com os gols esperados estimados para cada equipe e normalizadas para o confronto.':'Sem base de gols suficiente para calcular probabilidades de resultado com segurança.'},
+    vitoria_favorito:probs?((probs.home>=probs.away&&probs.home>=probs.draw)?{time:match.home,prob:Math.round(probs.home*100),analise:'Maior probabilidade pelo modelo de gols.'}:(probs.away>=probs.home&&probs.away>=probs.draw)?{time:match.away,prob:Math.round(probs.away*100),analise:'Maior probabilidade pelo modelo de gols.'}:{time:null,prob:null,analise:'Confronto equilibrado pelo modelo.'}):{time:null,prob:null,analise:'Sem base de gols suficiente para definir favorito estatístico.'},
+    sintese_estatistica:{pontos_chave:pad.slice(0,3),placar_provavel:probs?(Math.round(lh)+' x '+Math.round(la)):null,resumo:'A leitura principal é baseada no volume de gols esperado e nos indicadores históricos disponíveis; quanto menor a cobertura, maior a incerteza.'},
+    qualidade:{score:quality,nivel:nivel,descricao:'Cobertura de dados disponível: '+quality+'%. A análise não é interrompida por campos ausentes.'},
+    mercados_jogadores:playerRows.slice(0,6)
+  };
+  if(a.escanteios.media!=null){
+    var e=escTotal||0;a.escanteios.over85_pct=Math.round(Math.min(90,Math.max(20,(e/8.5)*55)));a.escanteios.over105_pct=Math.round(Math.min(85,Math.max(15,(e/10.5)*50)));
+  }
+  if(realData.jogadores){
+    if(realData.jogadores.hScorer)a.resumo_casa.artilheiro=realData.jogadores.hScorer;
+    if(realData.jogadores.aScorer)a.resumo_fora.artilheiro=realData.jogadores.aScorer;
+    if(realData.jogadores.hAssist)a.resumo_casa.destaque={nome:realData.jogadores.hAssist.nome,funcao:'Líder de assistências'};
+    if(realData.jogadores.aAssist)a.resumo_fora.destaque={nome:realData.jogadores.aAssist.nome,funcao:'Líder de assistências'};
+  }
+  a.mercados_recomendados=buildMarkets(match,a);
+  return a;
+}
+
+function chatRetryAnalysis(matchId) {
+  CHAT_STATE.step = 'match';
+  chatPickMatch(matchId, null);
+}
+
+async function chatPickMatch(matchId, el) {
+  if (CHAT_STATE.step !== 'match') return;
+  var matches = CHAT_MATCHES_CACHE[CHAT_STATE.selectedDate] || [];
+  var match = matches.find(function(m){ return String(m.id) === String(matchId); });
+  if (!match) return;
+
+  CHAT_STATE.step = 'loading_analysis';
+  CHAT_STATE.selectedMatch = match;
+  document.querySelectorAll('.match-btn').forEach(function(b){ b.disabled = true; b.classList.remove('selected'); });
+  if (el) el.classList.add('selected');
+
+  appendChat(chatUser((match.hFlag ? match.hFlag+' ' : '') + match.home + ' vs ' + match.away + (match.aFlag ? ' '+match.aFlag : '')));
+  appendChat(chatTyping());
+
+  var realData = API_KEY ? await buscarDadosReais(match) : null;
+  // NOVO COMPORTAMENTO: a análise local nunca exige um pacote completo de dados.
+  // Se a API retornar apenas parte das estatísticas, usamos a parte disponível.
+  // Se a IA/backend estiver indisponível, a análise continua normalmente.
+  var analysisData = localAnalyzeMatch(match, realData || {});
+
+  removeTyping();
+
+  // Força nomes e histórico vindos da API, sem permitir que uma camada textual
+  // invente jogadores ou partidas.
+  var jogadoresReais = realData && realData.jogadores ? realData.jogadores : null;
+  var historicoReal = realData && realData.historico ? realData.historico : [];
+  if (historicoReal.length) analysisData.historico_recente = historicoReal;
+  if (jogadoresReais) {
+    if (analysisData.resumo_casa) {
+      analysisData.resumo_casa.artilheiro = jogadoresReais.hScorer || null;
+      analysisData.resumo_casa.destaque = jogadoresReais.hAssist ? {nome:jogadoresReais.hAssist.nome,funcao:'Líder de assistências'} : null;
+    }
+    if (analysisData.resumo_fora) {
+      analysisData.resumo_fora.artilheiro = jogadoresReais.aScorer || null;
+      analysisData.resumo_fora.destaque = jogadoresReais.aAssist ? {nome:jogadoresReais.aAssist.nome,funcao:'Líder de assistências'} : null;
+    }
+  }
+
+  renderChatAnalysis(match, analysisData);
+  CHAT_STATE.step = 'done';
+  setTimeout(function(){
+    appendChat(chatBot('Deseja analisar outra partida?' +
+      '<div class="match-btns" style="margin-top:8px">' +
+      '<button class="match-btn" onclick="chatReset()" style="background:var(--g4);border:1px solid var(--accent);color:var(--accent);">🔄 Nova consulta</button>' +
+      '</div>', false));
+  }, 400);
+}
+function renderChatAnalysis(match, a) {
+  // Sem dado real de forma recente, nao inventamos W/D/L — mostramos aviso.
+  var hf = match.hForm || null;
+  var af = match.aForm || null;
+  var formDots = function(arr){
+    if (!arr) return '<span style="font-size:9px;color:var(--muted)">sem dado</span>';
+    return arr.map(function(r){
+      return '<span style="display:inline-flex;width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;font-size:9px;font-weight:700;background:' + (r==='W'?'rgba(0,229,160,.2)':r==='D'?'rgba(255,215,0,.2)':'rgba(255,68,68,.2)') + ';color:' + (r==='W'?'var(--accent)':r==='D'?'var(--gold)':'var(--red)') + ';border:1px solid ' + (r==='W'?'rgba(0,229,160,.4)':r==='D'?'rgba(255,215,0,.4)':'rgba(255,68,68,.4)') + '">' + r + '</span>';
+    }).join(' ');
+  };
+
+  var fin = a.finalizacoes || {};
+  var flt = a.faltas || {};
+  var esc = a.escanteios || {};
+  var vit = a.vitorias || {};
+  var gol = a.gols || {};
+  var vf  = a.vitoria_favorito || {};
+  var rc  = a.resumo_casa || {};
+  var rf  = a.resumo_fora || {};
+  var hist = a.historico_recente || [];
+  var padroes = a.padroes || [];
+  var pp = a.sintese_estatistica || {};
+  var q = a.qualidade || {score:0,nivel:'PARCIAL',descricao:'Análise com dados disponíveis.'};
+  var recMarkets = a.mercados_recomendados || [];
+  var marketHtml = recMarkets.length ? '<div class="analysis-section" id="recommendedMarkets">' +
+    '<div class="analysis-section-title">🎯 Mercados Recomendados</div>' +
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:9px">Ordenados pela força estatística. Não dependem de odds e não são garantia de resultado.</div>' +
+    recMarkets.map(function(m){
+      var cls=m.score>=70?'high':m.score>=55?'medium':'low';
+      return '<div class="market-card '+cls+'">' +
+        '<div class="market-head"><div><div class="market-name">'+m.nome+'</div><div style="font-size:9px;color:var(--accent3);text-transform:uppercase;letter-spacing:.6px">'+(m.tag||'ESTATÍSTICO')+'</div></div><div class="market-score">'+m.score+'%</div></div>' +
+        '<div class="market-meta">'+m.base+' '+(m.exp?' '+m.exp:'')+'</div>' +
+      '</div>';
+    }).join('') + '</div>' : '';
+  LAST_ANALYSIS = {match:match, analysis:a};
+  try { renderMarketsPanel(); } catch(e) {}
+  // Formata numero real ou mostra "N/D" — nunca preenche com um numero de
+  // exemplo. "0" e string vazia contam como valor real valido.
+  var nd = function(v, suf){ return (v === null || v === undefined || v === '') ? 'N/D' : (v + (suf||'')); };
+
+  // Escudo do time se disponivel; senao bandeira (selecoes); senao iniciais.
+  var matchBadge = function(name, id, logo, flag){
+    if (logo) return teamLogo({ id: id || 0, name: name, logo: logo }, 40);
+    if (flag) return '<div style="font-size:26px;line-height:40px">' + flag + '</div>';
+    return teamLogo({ id: id || (name ? name.charCodeAt(0) : 0), name: name }, 40);
+  };
+
+  var html = '<div class="analysis-card">' +
+    '<div class="data-quality"><span>📊 Cobertura dos dados: <strong style="color:#fff">'+q.score+'%</strong> · '+q.nivel+'</span><span class="data-pill">Análise não bloqueada</span></div>' +
+    // ── HEADER ───────────────────────────────────────────
+    '<div style="text-align:center;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">' +
+      '<div style="font-size:11px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">' + match.league + (match.group ? ' · ' + match.group : '') + '</div>' +
+      '<div style="display:flex;align-items:center;justify-content:center;gap:10px">' +
+        '<div style="text-align:center">' + matchBadge(match.home, match.hId, match.hLogo, match.hFlag) + '<div style="font-size:13px;font-weight:700">' + match.home + '</div><div style="display:flex;gap:2px;justify-content:center;margin-top:4px">' + formDots(hf) + '</div></div>' +
+        '<div style="font-size:11px;color:var(--muted);padding:0 6px">VS</div>' +
+        '<div style="text-align:center">' + matchBadge(match.away, match.aId, match.aLogo, match.aFlag) + '<div style="font-size:13px;font-weight:700">' + match.away + '</div><div style="display:flex;gap:2px;justify-content:center;margin-top:4px">' + formDots(af) + '</div></div>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5">' + a.contexto + '</div>' +
+    '</div>' +
+
+    // ── RESUMO DOS TIMES ─────────────────────────────────
+    '<div class="analysis-section">' +
+      '<div class="analysis-section-title">🧩 Resumo dos Times</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+        // Casa
+        '<div style="background:rgba(0,229,160,.06);border:1px solid rgba(0,229,160,.2);border-radius:10px;padding:10px">' +
+          '<div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px">' + match.home + '</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:2px">📍 ' + (rc.posicao_tabela||'--') + '</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:2px">⚽ ' + (rc.artilheiro ? rc.artilheiro.nome + ' (' + rc.artilheiro.gols + ' gols)' : '--') + '</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:5px">⭐ ' + (rc.destaque ? rc.destaque.nome + ' · ' + rc.destaque.funcao : '--') + '</div>' +
+          '<div style="font-size:10px;margin-bottom:3px"><span style="color:var(--accent)">✅ </span>' + (rc.forca||'--') + '</div>' +
+          '<div style="font-size:10px"><span style="color:var(--red)">⚠️ </span>' + (rc.fraqueza||'--') + '</div>' +
+          (rc.estilo ? '<div style="font-size:10px;color:var(--muted);margin-top:4px;border-top:1px solid rgba(255,255,255,.06);padding-top:4px">🎮 ' + rc.estilo + '</div>' : '') +
+        '</div>' +
+        // Fora
+        '<div style="background:rgba(255,107,53,.06);border:1px solid rgba(255,107,53,.2);border-radius:10px;padding:10px">' +
+          '<div style="font-size:11px;font-weight:700;color:var(--accent2);margin-bottom:6px">' + match.away + '</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:2px">📍 ' + (rf.posicao_tabela||'--') + '</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:2px">⚽ ' + (rf.artilheiro ? rf.artilheiro.nome + ' (' + rf.artilheiro.gols + ' gols)' : '--') + '</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:5px">⭐ ' + (rf.destaque ? rf.destaque.nome + ' · ' + rf.destaque.funcao : '--') + '</div>' +
+          '<div style="font-size:10px;margin-bottom:3px"><span style="color:var(--accent)">✅ </span>' + (rf.forca||'--') + '</div>' +
+          '<div style="font-size:10px"><span style="color:var(--red)">⚠️ </span>' + (rf.fraqueza||'--') + '</div>' +
+          (rf.estilo ? '<div style="font-size:10px;color:var(--muted);margin-top:4px;border-top:1px solid rgba(255,255,255,.06);padding-top:4px">🎮 ' + rf.estilo + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // ── HISTÓRICO RECENTE ────────────────────────────────
+    (hist.length ? '<div class="analysis-section">' +
+      '<div class="analysis-section-title">📅 Histórico Recente</div>' +
+      hist.map(function(h){
+        var res = h.resultado || '';
+        var parts = res.split('-');
+        var g1 = parseInt(parts[0])||0, g2 = parseInt(parts[1])||0;
+        var isHome = h.jogo && h.jogo.indexOf(match.home) >= 0;
+        var won = (isHome && g1 > g2) || (!isHome && g2 > g1);
+        var drew = g1 === g2;
+        var rColor = won ? 'var(--accent)' : drew ? 'var(--gold)' : 'var(--red)';
+        var rBg = won ? 'rgba(0,229,160,.12)' : drew ? 'rgba(255,215,0,.1)' : 'rgba(255,68,68,.1)';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)">' +
+          '<div style="background:' + rBg + ';border:1px solid ' + rColor + ';border-radius:6px;padding:3px 8px;font-size:12px;font-weight:700;color:' + rColor + ';min-width:34px;text-align:center;flex-shrink:0">' + res + '</div>' +
+          '<div style="flex:1">' +
+            '<div style="font-size:11px;font-weight:500">' + h.jogo + '</div>' +
+            '<div style="font-size:10px;color:var(--muted)">' + (h.data||'') + (h.obs ? ' · ' + h.obs : '') + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('') +
+    '</div>' : '') +
+
+    // ── PADRÕES REPETIDOS ────────────────────────────────
+    (padroes.length ? '<div class="analysis-section">' +
+      '<div class="analysis-section-title">🔁 Padrões que se Repetem</div>' +
+      padroes.map(function(p){
+        return '<div style="display:flex;align-items:flex-start;gap:7px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">' +
+          '<span style="font-size:14px;flex-shrink:0">📌</span>' +
+          '<span style="font-size:12px;color:var(--text);line-height:1.5">' + p + '</span>' +
+        '</div>';
+      }).join('') +
+    '</div>' : '') +
+
+    // ── PROBABILIDADES ───────────────────────────────────
+    '<div class="analysis-section">' +
+      '<div class="analysis-section-title">🏆 Probabilidades de Vitória</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">' +
+        '<div style="text-align:center;background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.2);border-radius:8px;padding:8px">' +
+          '<div style="font-family:Bebas Neue,sans-serif;font-size:22px;color:var(--accent)">' + nd(vit.prob_casa,'%') + '</div>' +
+          '<div style="font-size:10px;color:var(--muted)">' + match.home + '</div></div>' +
+        '<div style="text-align:center;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:8px;padding:8px">' +
+          '<div style="font-family:Bebas Neue,sans-serif;font-size:22px;color:var(--gold)">' + nd(vit.prob_empate,'%') + '</div>' +
+          '<div style="font-size:10px;color:var(--muted)">Empate</div></div>' +
+        '<div style="text-align:center;background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.2);border-radius:8px;padding:8px">' +
+          '<div style="font-family:Bebas Neue,sans-serif;font-size:22px;color:var(--accent2)">' + nd(vit.prob_fora,'%') + '</div>' +
+          '<div style="font-size:10px;color:var(--muted)">' + match.away + '</div></div>' +
+      '</div>' +
+      (vf.time ? '<div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:8px;padding:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="font-size:12px;color:var(--muted)">⭐ Favorito: <strong style="color:#fff">' + vf.time + '</strong></span>' +
+        '<span style="font-family:Bebas Neue,sans-serif;font-size:18px;color:var(--gold)">' + nd(vf.prob,'%') + '</span></div>' : '') +
+      '<div style="font-size:12px;color:var(--muted);line-height:1.5">' + (vit.analise || 'Sem base suficiente para estimar probabilidades com confianca.') + '</div>' +
+    '</div>' +
+
+    // ── GOLS ─────────────────────────────────────────────
+    '<div class="analysis-section">' +
+      '<div class="analysis-section-title">⚽ Gols</div>' +
+      '<div class="stat-row"><span class="stat-name">xG esperado</span><span class="stat-value good">' + nd(gol.media_esperada) + '</span></div>' +
+      '<div class="stat-row"><span class="stat-name">Over 1.5</span><span class="stat-value ' + (gol.o15_pct != null && gol.o15_pct >= 70 ? 'good' : 'warn') + '">' + nd(gol.o15_pct,'%') + '</span></div>' +
+      '<div class="stat-row"><span class="stat-name">Over 2.5</span><span class="stat-value ' + (gol.o25_pct != null && gol.o25_pct >= 60 ? 'good' : 'warn') + '">' + nd(gol.o25_pct,'%') + '</span></div>' +
+      '<div class="stat-row"><span class="stat-name">BTTS</span><span class="stat-value ' + (gol.btts_pct != null && gol.btts_pct >= 60 ? 'good' : 'warn') + '">' + nd(gol.btts_pct,'%') + '</span></div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5">' + (gol.analise || 'Sem base suficiente para essa analise.') + '</div>' +
+    '</div>' +
+
+    // ── FINALIZAÇÕES ─────────────────────────────────────
+    '<div class="analysis-section">' +
+      '<div class="analysis-section-title">🎯 Finalizações</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">' +
+        '<div style="background:rgba(0,229,160,.06);border:1px solid rgba(0,229,160,.15);border-radius:8px;padding:8px">' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">' + match.home + '</div>' +
+          '<div class="stat-row" style="border:0;padding:2px 0"><span class="stat-name" style="font-size:11px">Total/jogo</span><span class="stat-value good" style="font-size:12px">' + (fin.casa_media||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:2px 0"><span class="stat-name" style="font-size:11px">No gol</span><span class="stat-value good" style="font-size:12px">' + (fin.casa_no_gol||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:2px 0"><span class="stat-name" style="font-size:11px">Fora do gol</span><span class="stat-value" style="font-size:12px">' + (fin.casa_fora_gol||'--') + '</span></div>' +
+        '</div>' +
+        '<div style="background:rgba(255,107,53,.06);border:1px solid rgba(255,107,53,.15);border-radius:8px;padding:8px">' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">' + match.away + '</div>' +
+          '<div class="stat-row" style="border:0;padding:2px 0"><span class="stat-name" style="font-size:11px">Total/jogo</span><span class="stat-value" style="font-size:12px">' + (fin.fora_media||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:2px 0"><span class="stat-name" style="font-size:11px">No gol</span><span class="stat-value" style="font-size:12px">' + (fin.fora_no_gol||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:2px 0"><span class="stat-name" style="font-size:11px">Fora do gol</span><span class="stat-value" style="font-size:12px">' + (fin.fora_fora_gol||'--') + '</span></div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--muted);line-height:1.5">' + (fin.analise||'') + '</div>' +
+    '</div>' +
+
+    // ── FALTAS + ESCANTEIOS ───────────────────────────────
+    '<div class="analysis-section">' +
+      '<div class="analysis-section-title">⚠️ Faltas & 🚩 Escanteios</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">' +
+        '<div style="background:rgba(0,229,160,.06);border:1px solid rgba(0,229,160,.15);border-radius:8px;padding:8px">' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:3px">' + match.home + '</div>' +
+          '<div class="stat-row" style="border:0;padding:1px 0"><span class="stat-name" style="font-size:11px">Faltas com.</span><span class="stat-value warn" style="font-size:11px">' + (flt.casa_cometidas||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:1px 0"><span class="stat-name" style="font-size:11px">Faltas sof.</span><span class="stat-value good" style="font-size:11px">' + (flt.casa_sofridas||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:1px 0"><span class="stat-name" style="font-size:11px">Escanteios</span><span class="stat-value" style="font-size:11px">' + (esc.casa_media||'--') + '</span></div>' +
+        '</div>' +
+        '<div style="background:rgba(255,107,53,.06);border:1px solid rgba(255,107,53,.15);border-radius:8px;padding:8px">' +
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:3px">' + match.away + '</div>' +
+          '<div class="stat-row" style="border:0;padding:1px 0"><span class="stat-name" style="font-size:11px">Faltas com.</span><span class="stat-value warn" style="font-size:11px">' + (flt.fora_cometidas||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:1px 0"><span class="stat-name" style="font-size:11px">Faltas sof.</span><span class="stat-value good" style="font-size:11px">' + (flt.fora_sofridas||'--') + '</span></div>' +
+          '<div class="stat-row" style="border:0;padding:1px 0"><span class="stat-name" style="font-size:11px">Escanteios</span><span class="stat-value" style="font-size:11px">' + (esc.fora_media||'--') + '</span></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="stat-row"><span class="stat-name">Escanteios media total</span><span class="stat-value warn">' + (esc.media||'--') + '</span></div>' +
+      '<div class="stat-row"><span class="stat-name">Over 8.5 escanteios</span><span class="stat-value ' + ((esc.over85_pct||0) >= 55 ? 'good' : 'warn') + '">' + (esc.over85_pct||'--') + '%</span></div>' +
+      '<div class="stat-row"><span class="stat-name">Over 10.5 escanteios</span><span class="stat-value ' + ((esc.over105_pct||0) >= 45 ? 'good' : 'warn') + '">' + (esc.over105_pct||'--') + '%</span></div>' +
+    '</div>' +
+
+    marketHtml +
+
+    // ── SÍNTESE ESTATÍSTICA (destaque, sem apostas/odds) ──
+    ((pp.pontos_chave || pp.placar_provavel || pp.resumo) ? '<div style="background:linear-gradient(135deg,rgba(0,229,160,.14),rgba(79,195,247,.1));border:2px solid rgba(0,229,160,.5);border-radius:14px;padding:14px;margin-top:4px">' +
+      '<div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">📊 Síntese Estatística</div>' +
+
+      // Pontos-chave
+      (pp.pontos_chave && pp.pontos_chave.length ?
+        '<div style="margin-bottom:10px">' +
+          '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Pontos-chave</div>' +
+          pp.pontos_chave.map(function(j){ return '<div style="font-size:11px;color:var(--text);display:flex;gap:5px;align-items:flex-start;margin-bottom:3px"><span>🔹</span><span>' + j + '</span></div>'; }).join('') +
+        '</div>' : '') +
+
+      // Placar provável
+      '<div style="border-top:1px solid rgba(0,229,160,.25);padding-top:10px;text-align:center">' +
+        '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Placar Provável</div>' +
+        '<div class="verdict-score">' + match.home + ' ' + (pp.placar_provavel||pp.placar_previsto||'--') + ' ' + match.away + '</div>' +
+        (pp.resumo ? '<div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;font-style:italic">' + pp.resumo + '</div>' : '') +
+      '</div>' +
+    '</div>' : '') +
+
+  '</div>';
+
+  appendChat(chatBot(html, true));
+}
+
+function renderMarketsPanel(){
+  var el=document.getElementById('marketsWindow');
+  if(!el) return;
+  if(!LAST_ANALYSIS){
+    el.innerHTML='<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;color:var(--muted);font-size:12px;line-height:1.5">Selecione uma partida na aba <strong style="color:var(--text)">Análises</strong>. Os mercados serão calculados automaticamente com os dados disponíveis.</div>';
+    return;
+  }
+  var m=LAST_ANALYSIS.match,a=LAST_ANALYSIS.analysis||{}, list=a.mercados_recomendados||[], q=a.qualidade||{};
+  var html='<div class="data-quality"><span>'+m.home+' x '+m.away+'</span><span class="data-pill">'+(q.nivel||'PARCIAL')+' · '+(q.score||0)+'%</span></div>';
+  if(!list.length){html+='<div class="market-card low"><div class="market-name">Sem mercado com base mínima</div><div class="market-meta">A análise da partida foi gerada, mas os dados disponíveis não sustentaram um mercado específico.</div></div>';}
+  else list.forEach(function(x){var cls=x.score>=70?'high':x.score>=55?'medium':'low';html+='<div class="market-card '+cls+'"><div class="market-head"><div><div class="market-name">'+x.nome+'</div><div style="font-size:9px;color:var(--accent3);text-transform:uppercase">'+(x.tag||'ESTATÍSTICO')+'</div></div><div class="market-score">'+x.score+'%</div></div><div class="market-meta">'+x.base+(x.exp?' '+x.exp:'')+'</div></div>';});
+  html+='<div style="font-size:10px;color:var(--muted);line-height:1.5;margin-top:8px">A porcentagem é uma força estatística estimada pelo modelo, não probabilidade de lucro. Use os mercados como filtro de análise, não como garantia.</div>';
+  el.innerHTML=html;
+}
+
+function chatReset() {
+  CHAT_STATE = { step: 'date', selectedDate: null, selectedMatch: null };
+  var w = document.getElementById('chatWindow');
+  w.innerHTML = '';
+  initChat();
+}
+
+// ── INIT ─────────────────────────────────────────────────
+// A chave/modo já foi restaurada no início do script (mais seguro).
+// Aqui só garantimos que a tela reflita o estado atual.
+atualizarTelaChaveAPI();
+try { document.getElementById('savedKeyHint').textContent = ''; } catch(e) {}
+initChat();
+</script>
+<script>
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('/service-worker.js').catch(function(){});
+  });
+}
+</script>
+</body>
+</html>
